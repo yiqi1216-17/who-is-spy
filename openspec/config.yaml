@@ -1,0 +1,43 @@
+schema: spec-driven
+
+context: |
+  Project: AI Who Is the Spy brownfield monorepo.
+  Selected delivery stack: Node.js/TypeScript server plus React web; leave the Go baseline unchanged.
+  Frozen boundaries: existing HTTP contract, server-authoritative rules, deterministic vote/winner resolution, allowlisted AgentContext, and no pre-finale leakage of other roles/words.
+  Product direction: real-human-data-grounded agents, private structured beliefs, sequential descriptions, reproducible benchmark evolution, redacted observability, atomic recovery, portrait-first first-person play, AI theater, highlights, and post-game omniscient replay.
+  Data policy: never represent synthetic or mixed data as direct human evidence; every record needs license/consent scope and lineage; unknown-rights data stays out of training and Git.
+  Security policy: never persist API keys, complete secret words, private prompts, free-text chain-of-thought, other-agent beliefs, or unresolved votes.
+  Source hierarchy: CANDIDATE_TASK.md and contract/CONTRACT.md define external hard constraints; the selected numbered OpenSpec change defines new behavior; its design.md defines implementation decisions; its tasks.md defines delivery order; docs/planning-history/01 and docs/planning-history/02 preserve exploratory rationale only.
+  Change dependency order: 03-human-data-and-agent-orchestration, then 04-evaluation-and-recovery, then 05-portrait-product-experience. Select one change explicitly during implementation.
+  Documentation language may be Chinese or English, but normative requirements use SHALL/MUST and testable WHEN/THEN scenarios.
+  Manually authored Markdown titles carry sequence numbers. OpenSpec- and skill-mandated filenames remain unchanged for framework compatibility.
+
+rules:
+  proposal:
+    - Keep the proposal concise and list every behavior-bearing capability.
+    - State compatibility, data-rights, privacy, and non-goals explicitly.
+  specs:
+    - Specify observable behavior rather than class names or library choices.
+    - Include normal, failure, privacy, and recovery scenarios where relevant.
+    - Preserve non-interference and terminal-reveal invariants in every affected capability.
+  design:
+    - Include alternatives and rationale for data, privacy, state, model, event, and evaluation decisions.
+    - Include migration and rollback for cross-cutting changes.
+  tasks:
+    - Keep each implementation task independently verifiable and normally below two hours.
+    - Pair behavior work with tests, benchmark evidence, or visual verification in the same task group.
+    - Capture meaningful commit boundaries and DECISIONS.md updates.
+
+operations:
+  apply:
+    guidance:
+      - "Use the project ship-who-is-spy-changes skill and installed Superpowers skills."
+      - "Follow test-driven development: observe a failing test or baseline before implementation."
+      - "Do not implement directly from docs/planning-history/01 or docs/planning-history/02; require a matching capability requirement and task in the selected change."
+      - "Respect the 03 to 04 to 05 dependency order and report any unmet predecessor contract before implementation."
+      - "Keep contract:node green and do not modify the Go implementation."
+      - "Record Coding Agent suggestions, human review, and genuine corrections in DECISIONS.md as work happens."
+  archive:
+    guidance:
+      - "Archive only after strict OpenSpec validation, tests, contract, benchmark gate, privacy scan, and required visual/real-model evidence pass."
+      - "Summarize residual risks and deliberately deferred work before archive."

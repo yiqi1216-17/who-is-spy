@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ship Who Is Spy Changes"
+  short_description: "Deliver approved OpenSpec changes with Superpowers discipline"
+  default_prompt: "Use OpenSpec artifacts and the Superpowers lifecycle to deliver an approved who-is-spy change with tests and verification evidence."
