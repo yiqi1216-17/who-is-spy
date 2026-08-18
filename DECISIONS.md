@@ -68,6 +68,18 @@
   也给可观测/恢复层(04)留了一个明确的失败信号(policyCode)。放弃了"截断/替换成安全占位串"的降级:
   那会把一条劣质描述伪装成正常发言,污染后续投票与评测。见 `quality-policy.test.ts` / `quality-gate.test.ts`。
   策略是**纯函数**,所以同一份可直接被评测线复用、可确定性回放,且判定不接触任何私有身份。
+- ① 怎么让 AI 有"记忆/推理"却不落自由文本 CoT、也不互相偷看:
+  给每个 AI 一份**私有结构化信念**(`beliefs.ts` 的 `Belief`:`suspicions[{playerId,score}]` +
+  `selfExposure` + `evidenceRefs[{playerId,round}]`),完全**没有自由文本字段**——所以天然通过 belief 的
+  strict schema,密词/身份/推理独白无处容身。信念由 `observeRound` **纯函数**从公开描述推导:一条描述与
+  本轮其余描述的字符 bigram 平均相似度越低越"离群",离群度→怀疑度按 **EMA(α=0.5)** 平滑更新,单调有界在
+  [0,1](复用质量门的 `similarity`,同一把尺子)。每条怀疑只挂 `(playerId, round)` 公开引用背书,不搬运原文。
+  跨 Agent 非干扰靠**签名**保证:`observeRound(prev, {round, selfId, descriptions})` 只吃"自己上一份信念 +
+  本轮公开描述",结构上拿不到任何他人信念;引擎把信念存在 `beliefs: Map<gameId, Map<agentId, Belief>>`,
+  **独立于 GameState**,故不随 `structuredClone` 草稿流动、`toPublic` 不序列化、`buildAgentContext` 不投影——
+  信念永不进公开 DTO / 他人上下文 / 存盘。放弃了"让模型自己写一段思考再解析"的做法:自由文本既会夹带密词、
+  又不可确定性回放、还无法在评测里当结构化特征用。见 `beliefs.test.ts`(归一化/校准/证据/非干扰)与
+  `beliefs-engine.test.ts`(信念不进公开 DTO、不进任一 Agent 上下文)。
 - ② 每个质量指标是怎么算的,阈值为什么定这个数:
 - ③ 一条日志 / trace 里记了哪些字段,怎么保证不把密词和 Key 写进去:
 

@@ -30,7 +30,7 @@
 
 ## 5. Add beliefs, hooks, policy, and orchestration
 
-- [ ] 5.1 Write belief normalization, calibration, evidence-reference, and cross-Agent non-interference tests, then add private structured belief state without free-text chain-of-thought.
+- [x] 5.1 Write belief normalization, calibration, evidence-reference, and cross-Agent non-interference tests, then add private structured belief state without free-text chain-of-thought.
 - [x] 5.2 Write hook projection, timeout, authority, failure-policy, and secret-sentinel tests, then add the typed hook registry.
 - [x] 5.3 Write sequential-context tests proving every later speaker sees only earlier public same-round descriptions, then replace parallel generation with deterministic seat order.
 - [x] 5.4 Write hidden-vote tests proving later voters cannot observe unresolved votes while deterministic code retains target and ballot authority.

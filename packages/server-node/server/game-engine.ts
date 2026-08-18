@@ -4,6 +4,8 @@ import type { GameModel } from './model.js';
 import { type GameAction, canAct, canTransition } from './state-machine.js';
 import { type QualityCode, evaluateDescription } from './quality-policy.js';
 import { type HookFn, HookRegistry } from './hooks.js';
+import { emptyBelief, observeRound } from './beliefs.js';
+import type { Belief } from './schema.js';
 import type {
   Description,
   GameReview,
@@ -51,6 +53,12 @@ export class GameEngine {
   private readonly chains = new Map<string, Promise<unknown>>();
   /** 观察者注册表:回合公开点向其发射脱敏公开投影(见 hooks.ts)。 */
   private readonly hooks = new HookRegistry();
+  /**
+   * 私有结构化信念:gameId → (agentId → Belief)。
+   * 每个 AI Agent 一份,从公开描述确定性推导,**绝不进公开 DTO / 他人上下文 / 存盘**。
+   * 独立于 GameState,故不随 structuredClone 草稿流动,也不被 toPublic 序列化。
+   */
+  private readonly beliefs = new Map<string, Map<string, Belief>>();
 
   constructor(
     private readonly model: GameModel,
@@ -60,6 +68,36 @@ export class GameEngine {
   /** 注册一个"回合已公开"观察者。返回注销函数。观察者只收公开投影,不能改变对局。 */
   registerRoundHook(name: string, fn: HookFn, opts?: { timeoutMs?: number }): () => void {
     return this.hooks.register('onRoundPublished', name, fn, opts);
+  }
+
+  /** 只读取某 Agent 的私有信念(供自检/测试);外部消费者拿不到、也不该拿到。 */
+  getAgentBelief(gameId: string, agentId: string): Belief | undefined {
+    return this.beliefs.get(gameId)?.get(agentId);
+  }
+
+  /**
+   * 回合描述全部公开后,为每个存活 AI 私有地更新信念(OpenSpec 03 · Task 5.1)。
+   * 输入只有本轮**公开**描述 (playerId, text);每个 Agent 独立 observeRound,互不读取他人信念。
+   * 结果存入引擎私有 map,永不进入 GameState / 公开 DTO / 他人上下文。
+   */
+  private updateBeliefs(game: GameState): void {
+    const roundDescriptions = game.descriptions
+      .filter((d) => d.round === game.round)
+      .map(({ playerId, text }) => ({ playerId, text }));
+    if (roundDescriptions.length === 0) return;
+    let store = this.beliefs.get(game.id);
+    if (!store) {
+      store = new Map<string, Belief>();
+      this.beliefs.set(game.id, store);
+    }
+    for (const agent of game.players) {
+      if (agent.isHuman || !agent.alive) continue;
+      const prev = store.get(agent.id) ?? emptyBelief();
+      store.set(
+        agent.id,
+        observeRound(prev, { round: game.round, selfId: agent.id, descriptions: roundDescriptions }),
+      );
+    }
   }
 
   /** 在回合描述全部公开后,向观察者发射脱敏公开投影;观察者失败/超时绝不影响对局。 */
@@ -199,6 +237,7 @@ export class GameEngine {
       text: '所有人描述完毕。观察措辞，投出你最怀疑的一票。',
       round: game.round,
     });
+    this.updateBeliefs(game);
     await this.publishRound(game);
     return this.toPublic(game);
   }
@@ -256,6 +295,7 @@ export class GameEngine {
         this.transitionTo(game, 'voting');
         game.ballot = 1;
         game.eligibleTargetIds = null;
+        this.updateBeliefs(game);
         await this.publishRound(game);
       } else {
         const votes = await this.generateVotes(game);
