@@ -3,6 +3,7 @@ import { buildAgentContext } from './agent-context.js';
 import type { GameModel } from './model.js';
 import { type GameAction, canAct, canTransition } from './state-machine.js';
 import { type QualityCode, evaluateDescription } from './quality-policy.js';
+import { type HookFn, HookRegistry } from './hooks.js';
 import type {
   Description,
   GameReview,
@@ -48,11 +49,40 @@ export class GameEngine {
   private readonly games = new Map<string, GameState>();
   /** 每局一条命令链:同一对局的命令串行执行,杜绝并发交错。 */
   private readonly chains = new Map<string, Promise<unknown>>();
+  /** 观察者注册表:回合公开点向其发射脱敏公开投影(见 hooks.ts)。 */
+  private readonly hooks = new HookRegistry();
 
   constructor(
     private readonly model: GameModel,
     private readonly random: () => number = Math.random,
   ) {}
+
+  /** 注册一个"回合已公开"观察者。返回注销函数。观察者只收公开投影,不能改变对局。 */
+  registerRoundHook(name: string, fn: HookFn, opts?: { timeoutMs?: number }): () => void {
+    return this.hooks.register('onRoundPublished', name, fn, opts);
+  }
+
+  /** 在回合描述全部公开后,向观察者发射脱敏公开投影;观察者失败/超时绝不影响对局。 */
+  private async publishRound(game: GameState): Promise<void> {
+    if (this.hooks.size('onRoundPublished') === 0) return;
+    const projection = {
+      hook: 'onRoundPublished' as const,
+      round: game.round,
+      public: {
+        descriptions: game.descriptions
+          .filter((d) => d.round === game.round)
+          .map(({ playerId, text, round }) => ({ playerId, text, round })),
+        eliminations: game.events
+          .filter((event) => event.type === 'elimination')
+          .map(({ text, round }) => ({ text, round })),
+      },
+    };
+    try {
+      await this.hooks.emit('onRoundPublished', projection);
+    } catch {
+      // 观察者层的任何异常都不回传主流程(投影已在注册表内校验/隔离)。
+    }
+  }
 
   /**
    * 每局守卫 + 原子提交(OpenSpec 03 · Task 5.6)。
@@ -169,6 +199,7 @@ export class GameEngine {
       text: '所有人描述完毕。观察措辞，投出你最怀疑的一票。',
       round: game.round,
     });
+    await this.publishRound(game);
     return this.toPublic(game);
   }
 
@@ -225,6 +256,7 @@ export class GameEngine {
         this.transitionTo(game, 'voting');
         game.ballot = 1;
         game.eligibleTargetIds = null;
+        await this.publishRound(game);
       } else {
         const votes = await this.generateVotes(game);
         game.votes.push(...votes);
