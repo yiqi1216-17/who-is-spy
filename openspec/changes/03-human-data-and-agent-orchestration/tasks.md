@@ -2,6 +2,14 @@
 
 > Each task begins with a failing test or recorded baseline and ends with evidence plus a meaningful commit boundary. Do not claim human learning until approved human records and provenance evidence exist.
 
+> **范围决定(2026-08-19 · 记入 `DECISIONS.md`)**:§3 数据治理(consent/rights/withdrawal/lineage/split)、
+> §4 的**真实语料挖掘 + 形式化溯源测试**、§2.3 迁移守卫,按"以效果为目标、不引入数据治理开销"的**显式取舍延后**,
+> 不在本轮交付——非遗漏。已交付的是其**效果等价物**:策略×代码解耦(B/C 层)已落地并接线——
+> `strategies.ts` 四份**版本化、可解释、`provenance` 标注**的种子策略经 `agent-context` 渲染进 prompt(反转 CH-2)。
+> 种子**诚实标注 `synthetic`(手写)**,把它替换为真实语料抽取的分布是**纯数据变更、不动编排代码**(解耦的价值即在此)。
+> 延后项已结构化交接:2.3/信封收口→**04-G**;语料回填→**C 阶段**(见 handoff §6.4-b 分诊表)。
+> 计:**交付范围 15 项全绿**;9 项治理轨为显式延后,下方保留原文并逐条标注,便于现场追溯与后续拾取。
+
 ## 1. Freeze the brownfield baseline
 
 - [x] 1.1 Run and record Node domain, HTTP, build, and `contract:node` results as B0; preserve one deterministic fixture transcript without changing behavior.
@@ -12,16 +20,25 @@
 
 - [x] 2.1 Write producer/consumer compatibility tests, then add versioned schemas for public state, events, Agent context, beliefs, strategies, model outputs, dataset records, hooks, traces, and reports.
 - [x] 2.2 Write legal/illegal transition-table tests, then route Node phases and actions through an explicit domain state machine without changing the public HTTP contract.
-- [ ] 2.3 Add migration fixtures proving incompatible persisted datasets, traces, replay envelopes, and reports fail with actionable version errors.
+- [ ] 2.3 Add migration fixtures proving incompatible persisted datasets, traces, replay envelopes, and reports fail with actionable version errors. — **延后→04-G**(与版本化信封收口同批做;A3 迁移守卫)
 
-## 3. Build the human-game data foundation
+## 3. Build the human-game data foundation — 延后(范围决定:不引入数据治理开销)
+
+> 整段为数据合规机器(consent/rights/withdrawal/lineage/split-manifests/runbook)。用户显式"别管数据政策、
+> 以效果为目标",故本轮不交付;真实语料若在 C 阶段接入,再按需拾取。运行系统当前只用 `synthetic` 种子策略,
+> 不依赖任何人类语料,因此**无未兑现的隐私承诺**(基线 spec 未纳入这些要求,避免"号称合规实则未实现")。
 
 - [ ] 3.1 Write manifest and consent validation tests, then implement source rights, consent scope, anonymized players, action history, annotations, lineage, withdrawal, and export eligibility schemas.
 - [ ] 3.2 Add deterministic import and quarantine tests for first-party records plus explicitly licensed transfer corpora; reject unknown-rights, malformed, or mislabeled synthetic records.
 - [ ] 3.3 Add split-leakage tests, then produce grouped train, validation, frozen-core, rolling-challenge, and preference-holdout manifests isolated by game, cohort, word pair, and time.
 - [ ] 3.4 Publish the collection runbook, consent copy, annotation guide, seed corpus report, data statement, and honest sample-count evidence.
 
-## 4. Derive evidence-backed strategies
+## 4. Derive evidence-backed strategies — 解耦已交付 / 真实语料挖掘延后
+
+> **已交付(效果核心)**:策略作为版本化数据(`strategies.ts` `SEED_STRATEGIES`,四份 persona/tactics/
+> specificity·novelty·risk,`provenance:{kind:'synthetic'}`),经 `agent-context.strategyForAgent` 渲染进 prompt。
+> 反转 CH-2:策略不再硬编码,可只换数据不动代码。**延后**的是把 `synthetic` 手写种子替换为真实语料**抽取的分布**,
+> 及其形式化溯源/检索资格/校准消融测试(4.2–4.4 的治理化部分)。架构已就绪,替换是纯数据变更。
 
 - [ ] 4.1 Record B0 behavior distributions, then extract reproducible speech tactics, social acts, specificity, novelty, and outcomes from eligible training records.
 - [ ] 4.2 Add strategy-provenance tests, then generate versioned interpretable prototypes with representative sample IDs and measured distributions.
@@ -42,4 +59,4 @@
 - [x] 6.1 Run paired B0/B1/B2/B3 fixture ablations for sequential orchestration, human retrieval/prototypes, and beliefs/ranking using the same scenarios and seeds.
 - [x] 6.2 Prove pre-finale role/word, cross-Agent belief, complete-state, private-prompt, and unresolved-vote sentinels never cross model, hook, public DTO, or persisted artifact boundaries.
 - [x] 6.3 Run Node tests, build, `contract:node`, strict OpenSpec validation, and a budget-capped DeepSeek smoke game; preserve redacted evidence and exact versions.
-- [ ] 6.4 Document the shared event/report interfaces and residual risks required by changes 04 and 05, then request independent architecture and privacy review.
+- [x] 6.4 Document the shared event/report interfaces and residual risks required by changes 04 and 05, then request independent architecture and privacy review.
