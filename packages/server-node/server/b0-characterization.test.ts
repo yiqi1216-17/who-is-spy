@@ -11,7 +11,8 @@ import type { AgentContext, GameReview, GameState, Player } from './types.js';
  * 这些断言描述的是 **当前(B0)行为**,当前应全部通过。
  *
  * 其中三条是任务线① 要修复的"病":
- *   - CH-1 顺序:后发 AI 看不到本轮先发 AI 的描述(接缝落地后反转为"看得到")。
+ *   - CH-1 顺序:后发 AI 看不到本轮先发 AI 的描述。
+ *       —— 已由 B1(§5.3)反转为"看得到",正向断言迁移至 orchestration.test.ts。
  *   - CH-2 人设:AgentContext 无策略/人设传导通道,style 字段对行为零影响(接缝后新增 strategy 通道)。
  *   - CH-3 质量:同轮同质/重复描述不被任何机制拦截(接缝后由 QualityPolicy 拦下)。
  * 一条是必须 **保持** 的不变量:
@@ -45,22 +46,7 @@ class FailingFakeModel extends FakeGameModel {
 }
 
 describe('B0 特征化 · 描述阶段编排', () => {
-  it('CH-1 顺序:四个 AI 并行,后发看不到本轮先发 AI 的描述', async () => {
-    const model = new FakeGameModel();
-    const engine = new GameEngine(model, DETERMINISTIC);
-    const game = engine.createGame();
-
-    await engine.submitHumanDescription(game.id, '人类先给出的一句描述');
-
-    // 四个 AI 都被调用
-    expect(model.descriptionContexts).toHaveLength(4);
-    for (const ctx of model.descriptionContexts) {
-      const sameRoundEntries = ctx.game.publicDescriptions.filter((d) => d.round === 1);
-      // 只看得到人类那一条,看不到任何本轮 AI 的描述(这是 B0 的"病")
-      expect(sameRoundEntries.every((d) => d.playerId === 'human')).toBe(true);
-      expect(sameRoundEntries.filter((d) => d.playerId !== 'human')).toHaveLength(0);
-    }
-  });
+  // CH-1(后发看不到先发)已由 B1(§5.3)反转,正向断言见 orchestration.test.ts。
 
   it('CH-2 人设:AgentContext 无策略/人设通道,style 不传导', async () => {
     const model = new FakeGameModel();

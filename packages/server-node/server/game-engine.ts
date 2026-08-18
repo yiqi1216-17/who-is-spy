@@ -193,14 +193,18 @@ export class GameEngine {
 
   private async generateDescriptions(game: GameState): Promise<Description[]> {
     const agents = game.players.filter((player) => !player.isHuman && player.alive);
-    const outputs = await Promise.all(
-      agents.map(async (agent) => ({
-        playerId: agent.id,
-        text: await this.model.describe(buildAgentContext(game, agent)),
-        round: game.round,
-      })),
-    );
-    return outputs;
+    // 确定性座次串行:每个后发 Agent 都能看到本轮已公开的先发描述(人类 + 更早座次的 AI),
+    // 同时仍只经 buildAgentContext 的允许列投影,读不到他人身份与词(反转 CH-1,保持隔离)。
+    const produced: Description[] = [];
+    for (const agent of agents) {
+      const contextGame: GameState = {
+        ...game,
+        descriptions: [...game.descriptions, ...produced],
+      };
+      const text = await this.model.describe(buildAgentContext(contextGame, agent));
+      produced.push({ playerId: agent.id, text, round: game.round });
+    }
+    return produced;
   }
 
   private async generateVotes(game: GameState): Promise<Vote[]> {
