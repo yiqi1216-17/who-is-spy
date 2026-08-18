@@ -59,11 +59,17 @@ export class DeepSeekClient implements GameModel {
   }
 
   async describe(context: AgentContext): Promise<string> {
+    const { strategy } = context;
     const messages: ChatMessage[] = [
       {
         role: 'system',
         content:
-          '你正在玩“谁是卧底”。只依据收到的私有身份、自己的词和公开信息行动。绝不说出词语本身，不虚构其他玩家信息。用自然、含蓄、像真人的中文描述，避免每轮重复角度。只输出 JSON。',
+          '你正在玩“谁是卧底”。只依据收到的私有身份、自己的词和公开信息行动。绝不说出词语本身，不虚构其他玩家信息。' +
+          '用自然、含蓄、像真人的中文描述，避免每轮重复角度。' +
+          `请贴合你的策略人设“${strategy.persona}”：倾向手法为「${strategy.tactics.join('、')}」；` +
+          `具体度约 ${fmt(strategy.specificity)}（越高越贴近细节但绝不泄词）、` +
+          `新颖度约 ${fmt(strategy.novelty)}（越高越换角度、越避免与已公开描述雷同）、` +
+          `冒险度约 ${fmt(strategy.risk)}（越高越敢贴近，但仍不得说出词本身）。只输出 JSON。`,
       },
       {
         role: 'user',
@@ -205,6 +211,11 @@ export class DeepSeekClient implements GameModel {
     }
     throw new ModelError('AI 服务暂时不可用，已自动重试；请稍后再试', lastError);
   }
+}
+
+/** 把 0–1 的连续量转成便于模型理解的百分比语言。 */
+function fmt(value: number): string {
+  return `${Math.round(value * 100)}%`;
 }
 
 function stripCodeFence(content: string): string {

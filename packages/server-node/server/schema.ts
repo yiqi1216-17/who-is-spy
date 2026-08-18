@@ -75,11 +75,22 @@ const publicStateSchema = z
   .strict();
 
 // —— Agent 上下文(允许列投影) ——
+const strategyViewSchema = z
+  .object({
+    persona: z.string(),
+    tactics: z.array(z.string()),
+    specificity: unit,
+    novelty: unit,
+    risk: unit,
+  })
+  .strict();
+
 const agentContextSchema = z
   .object({
     identity: z
       .object({ playerId: z.string(), name: z.string(), role, word: z.string() })
       .strict(),
+    strategy: strategyViewSchema,
     game: z
       .object({
         round: z.number().int().nonnegative(),
@@ -244,6 +255,9 @@ export const SCHEMAS = {
 } as const;
 
 export type SchemaKind = keyof typeof SCHEMAS;
+export type Strategy = z.infer<typeof strategySchema>;
+export type Belief = z.infer<typeof beliefSchema>;
+export type TraceEvent = z.infer<typeof traceEventSchema>;
 export type Versioned<K extends SchemaKind> = {
   v: number;
   kind: K;

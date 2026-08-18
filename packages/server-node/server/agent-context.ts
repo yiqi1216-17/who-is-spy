@@ -1,6 +1,11 @@
-import type { AgentContext, GameState, Player } from './types.js';
+import { strategyForAgent } from './strategies.js';
+import type { AgentContext, GameState, Player, StrategyView } from './types.js';
 
-export function buildAgentContext(game: GameState, agent: Player): AgentContext {
+export function buildAgentContext(
+  game: GameState,
+  agent: Player,
+  strategy: StrategyView = strategyForAgent(agent),
+): AgentContext {
   if (agent.isHuman) {
     throw new Error('Human players do not receive an AI agent context');
   }
@@ -14,6 +19,7 @@ export function buildAgentContext(game: GameState, agent: Player): AgentContext 
       role: agent.role,
       word: agent.word,
     },
+    strategy,
     game: {
       round: game.round,
       alivePlayers: game.players

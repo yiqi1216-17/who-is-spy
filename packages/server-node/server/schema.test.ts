@@ -35,6 +35,7 @@ const VALID: Record<SchemaKind, unknown> = {
   event: { id: 'e1', type: 'description', text: '一句描述', round: 1, playerId: 'human' },
   agentContext: {
     identity: { playerId: 'ai-1', name: '阿序', role: 'civilian', word: '苹果' },
+    strategy: { persona: '谨慎观察', tactics: ['先给上位概念'], specificity: 0.35, novelty: 0.5, risk: 0.2 },
     game: {
       round: 1,
       alivePlayers: [{ id: 'ai-1', name: '阿序' }],

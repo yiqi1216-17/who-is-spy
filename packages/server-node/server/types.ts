@@ -81,6 +81,15 @@ export interface PublicGameState {
   model: string;
 }
 
+/** 策略投影:只暴露渲染所需字段,不含来源/样本 ID 等元数据。 */
+export interface StrategyView {
+  persona: string;
+  tactics: string[];
+  specificity: number;
+  novelty: number;
+  risk: number;
+}
+
 export interface AgentContext {
   identity: {
     playerId: string;
@@ -88,6 +97,7 @@ export interface AgentContext {
     role: Role;
     word: string;
   };
+  strategy: StrategyView;
   game: {
     round: number;
     alivePlayers: Array<{ id: string; name: string }>;

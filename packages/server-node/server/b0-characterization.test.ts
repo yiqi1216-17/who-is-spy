@@ -13,7 +13,8 @@ import type { AgentContext, GameReview, GameState, Player } from './types.js';
  * 其中三条是任务线① 要修复的"病":
  *   - CH-1 顺序:后发 AI 看不到本轮先发 AI 的描述。
  *       —— 已由 B1(§5.3)反转为"看得到",正向断言迁移至 orchestration.test.ts。
- *   - CH-2 人设:AgentContext 无策略/人设传导通道,style 字段对行为零影响(接缝后新增 strategy 通道)。
+ *   - CH-2 人设:AgentContext 无策略/人设传导通道,style 字段对行为零影响。
+ *       —— 已由 B4(§5.1/§4)反转为带 strategy 投影通道,正向断言迁移至 persona.test.ts。
  *   - CH-3 质量:同轮同质/重复描述不被任何机制拦截(接缝后由 QualityPolicy 拦下)。
  * 一条是必须 **保持** 的不变量:
  *   - CH-4 原子性:单个 AI 失败时,这一回合不留半成品状态。
@@ -47,25 +48,7 @@ class FailingFakeModel extends FakeGameModel {
 
 describe('B0 特征化 · 描述阶段编排', () => {
   // CH-1(后发看不到先发)已由 B1(§5.3)反转,正向断言见 orchestration.test.ts。
-
-  it('CH-2 人设:AgentContext 无策略/人设通道,style 不传导', async () => {
-    const model = new FakeGameModel();
-    const engine = new GameEngine(model, DETERMINISTIC);
-    const game = engine.createGame();
-
-    await engine.submitHumanDescription(game.id, '人类先给出的一句描述');
-
-    const ctx = model.descriptionContexts[0];
-    // 上下文顶层只有 identity 与 game,没有 strategy/persona 通道
-    expect(Object.keys(ctx).sort()).toEqual(['game', 'identity']);
-    expect(Object.keys(ctx.identity).sort()).toEqual(['name', 'playerId', 'role', 'word']);
-
-    // AI_PROFILES 里的 style 文案从未进入任何 AI 的上下文
-    const serialized = JSON.stringify(model.descriptionContexts);
-    for (const style of ['谨慎观察', '直觉敏锐', '逻辑派', '出其不意']) {
-      expect(serialized).not.toContain(style);
-    }
-  });
+  // CH-2(无策略/人设通道)已由 B4(§5.1/§4)反转,正向断言见 persona.test.ts。
 
   it('CH-3 质量:四个 AI 输出完全相同也不被拦截,直接进入投票', async () => {
     const model = new HomogeneousFakeModel('一句一模一样的描述');
