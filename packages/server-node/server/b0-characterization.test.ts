@@ -15,23 +15,13 @@ import type { AgentContext, GameReview, GameState, Player } from './types.js';
  *       —— 已由 B1(§5.3)反转为"看得到",正向断言迁移至 orchestration.test.ts。
  *   - CH-2 人设:AgentContext 无策略/人设传导通道,style 字段对行为零影响。
  *       —— 已由 B4(§5.1/§4)反转为带 strategy 投影通道,正向断言迁移至 persona.test.ts。
- *   - CH-3 质量:同轮同质/重复描述不被任何机制拦截(接缝后由 QualityPolicy 拦下)。
+ *   - CH-3 质量:同轮同质/重复描述不被任何机制拦截。
+ *       —— 已由 B3(§5.5)反转为由质量策略拦下,正向断言迁移至 quality-gate.test.ts。
  * 一条是必须 **保持** 的不变量:
  *   - CH-4 原子性:单个 AI 失败时,这一回合不留半成品状态。
  */
 
 const DETERMINISTIC = () => 0;
-
-/** 所有 AI 返回同一句话,用于验证"同质不拦截"。 */
-class HomogeneousFakeModel extends FakeGameModel {
-  constructor(private readonly line: string) {
-    super();
-  }
-  async describe(context: AgentContext): Promise<string> {
-    this.descriptionContexts.push(structuredClone(context));
-    return this.line;
-  }
-}
 
 /** 指定某个 AI 的 describe 抛错,用于验证失败原子性。 */
 class FailingFakeModel extends FakeGameModel {
@@ -49,22 +39,7 @@ class FailingFakeModel extends FakeGameModel {
 describe('B0 特征化 · 描述阶段编排', () => {
   // CH-1(后发看不到先发)已由 B1(§5.3)反转,正向断言见 orchestration.test.ts。
   // CH-2(无策略/人设通道)已由 B4(§5.1/§4)反转,正向断言见 persona.test.ts。
-
-  it('CH-3 质量:四个 AI 输出完全相同也不被拦截,直接进入投票', async () => {
-    const model = new HomogeneousFakeModel('一句一模一样的描述');
-    const engine = new GameEngine(model, DETERMINISTIC);
-    const game = engine.createGame();
-
-    const voting = await engine.submitHumanDescription(game.id, '人类的独特描述');
-
-    expect(voting.phase).toBe('voting');
-    const aiTexts = voting.descriptions
-      .filter((d) => d.playerId !== 'human')
-      .map((d) => d.text);
-    expect(aiTexts).toHaveLength(4);
-    // 四条完全相同,却没有任何同质化门禁拦下(这是 B0 的"病")
-    expect(new Set(aiTexts).size).toBe(1);
-  });
+  // CH-3(同质不拦截)已由 B3(§5.5)反转,正向断言见 quality-gate.test.ts。
 
   it('CH-4 原子性:单个 AI 描述失败时,这一回合不留半成品状态', async () => {
     const model = new FailingFakeModel('ai-2');

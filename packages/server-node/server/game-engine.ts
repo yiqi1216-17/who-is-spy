@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { buildAgentContext } from './agent-context.js';
 import type { GameModel } from './model.js';
 import { type GameAction, canAct, canTransition } from './state-machine.js';
+import { type QualityCode, evaluateDescription } from './quality-policy.js';
 import type {
   Description,
   GameReview,
@@ -27,6 +28,21 @@ export class GameRuleError extends Error {
     this.name = 'GameRuleError';
   }
 }
+
+/** 单个 AI 的描述反复不合规、重试耗尽时抛出。回合原子终止,不留半成品(保 CH-4)。 */
+export class QualityExhaustedError extends GameRuleError {
+  constructor(
+    public readonly playerId: string,
+    public readonly code: QualityCode,
+    public readonly attempts: number,
+  ) {
+    super(`AI（${playerId}）连续 ${attempts} 次未能给出合规描述（${code}），本回合已安全终止`, 500);
+    this.name = 'QualityExhaustedError';
+  }
+}
+
+/** 单个 AI 描述的最大生成尝试次数:首次不合规后最多再纠正 (N-1) 次。 */
+export const MAX_DESCRIBE_ATTEMPTS = 3;
 
 export class GameEngine {
   private readonly games = new Map<string, GameState>();
@@ -197,14 +213,44 @@ export class GameEngine {
     // 同时仍只经 buildAgentContext 的允许列投影,读不到他人身份与词(反转 CH-1,保持隔离)。
     const produced: Description[] = [];
     for (const agent of agents) {
-      const contextGame: GameState = {
-        ...game,
-        descriptions: [...game.descriptions, ...produced],
-      };
-      const text = await this.model.describe(buildAgentContext(contextGame, agent));
+      const visible = [...game.descriptions, ...produced];
+      const contextGame: GameState = { ...game, descriptions: visible };
+      const text = await this.describeWithQualityGate(contextGame, agent, visible);
       produced.push({ playerId: agent.id, text, round: game.round });
     }
     return produced;
+  }
+
+  /**
+   * 在生成边界应用共享质量策略:有界重试(correction)→ 穷尽即抛错(exhaustion)。
+   * 策略是纯函数、模型无关;引擎只负责重试与原子终止,不改判定逻辑(反转 CH-3)。
+   */
+  private async describeWithQualityGate(
+    contextGame: GameState,
+    agent: Player,
+    visible: Description[],
+  ): Promise<string> {
+    // 同轮他人描述 → 同质判定;本 Agent 更早轮次自述 → 自我重复判定。
+    const priorPublicTexts = visible
+      .filter((d) => d.round === contextGame.round && d.playerId !== agent.id)
+      .map((d) => d.text);
+    const ownPriorTexts = visible
+      .filter((d) => d.round < contextGame.round && d.playerId === agent.id)
+      .map((d) => d.text);
+
+    let lastCode: QualityCode = 'too_short';
+    for (let attempt = 1; attempt <= MAX_DESCRIBE_ATTEMPTS; attempt += 1) {
+      const text = await this.model.describe(buildAgentContext(contextGame, agent));
+      const verdict = evaluateDescription({
+        text,
+        secretWord: agent.word,
+        priorPublicTexts,
+        ownPriorTexts,
+      });
+      if (verdict.ok) return text;
+      lastCode = verdict.code;
+    }
+    throw new QualityExhaustedError(agent.id, lastCode, MAX_DESCRIBE_ATTEMPTS);
   }
 
   private async generateVotes(game: GameState): Promise<Vote[]> {
