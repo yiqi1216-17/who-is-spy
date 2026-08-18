@@ -90,6 +90,17 @@ export interface StrategyView {
   risk: number;
 }
 
+/**
+ * 投票目标投影:交给模型的候选**只含非机密字段**,结构上不含 role/word。
+ * 与 StrategyView 同源思路——机密不靠适配器自觉剥离,而由类型在边界处结构性拦截。
+ */
+export interface VoteTarget {
+  id: string;
+  name: string;
+  isHuman: boolean;
+  alive: boolean;
+}
+
 export interface AgentContext {
   identity: {
     playerId: string;

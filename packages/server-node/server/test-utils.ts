@@ -1,4 +1,4 @@
-import type { AgentContext, GameReview, GameState, Player } from './types.js';
+import type { AgentContext, GameReview, GameState, VoteTarget } from './types.js';
 import type { GameModel } from './model.js';
 
 /** 八句互相区分、均不含密词的假描述,供质量门在正常路径下恒放行。 */
@@ -33,7 +33,7 @@ export class FakeGameModel implements GameModel {
 
   async vote(
     context: AgentContext,
-    allowedTargets: Player[],
+    allowedTargets: VoteTarget[],
   ): Promise<{ targetId: string; reason: string }> {
     this.voteContexts.push(structuredClone(context));
     const human = allowedTargets.find((player) => player.isHuman);

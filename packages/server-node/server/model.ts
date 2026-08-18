@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { AgentContext, GameReview, GameState, Player } from './types.js';
+import type { AgentContext, GameReview, GameState, VoteTarget } from './types.js';
 
 const descriptionSchema = z.object({
   description: z.string().trim().min(2).max(60),
@@ -39,7 +39,7 @@ export interface GameModel {
   readonly model: string;
   isConfigured(): boolean;
   describe(context: AgentContext): Promise<string>;
-  vote(context: AgentContext, allowedTargets: Player[]): Promise<{ targetId: string; reason: string }>;
+  vote(context: AgentContext, allowedTargets: VoteTarget[]): Promise<{ targetId: string; reason: string }>;
   review(game: GameState): Promise<GameReview>;
 }
 
@@ -96,7 +96,7 @@ export class DeepSeekClient implements GameModel {
     throw new ModelError('AI 未能生成合规描述，已自动重试；请再试一次', lastError);
   }
 
-  async vote(context: AgentContext, allowedTargets: Player[]): Promise<{ targetId: string; reason: string }> {
+  async vote(context: AgentContext, allowedTargets: VoteTarget[]): Promise<{ targetId: string; reason: string }> {
     const targetIds = allowedTargets.map((player) => player.id);
     const messages: ChatMessage[] = [
       {

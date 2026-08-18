@@ -15,6 +15,7 @@ import type {
   PublicGameState,
   Role,
   Vote,
+  VoteTarget,
 } from './types.js';
 import { chooseWordPair } from './words.js';
 
@@ -359,11 +360,24 @@ export class GameEngine {
     const voters = game.players.filter((player) => !player.isHuman && player.alive);
     return Promise.all(
       voters.map(async (voter) => {
-        const allowedTargets = this.allowedTargets(game, voter);
-        const result = await this.model.vote(buildAgentContext(game, voter), allowedTargets);
+        const allowed = this.allowedTargets(game, voter);
+        // 隐私(M 边界):只把非机密投影(id/name/isHuman/alive)交给模型——role/word
+        // 结构上无法随 allowedTargets 越界,不再依赖适配器自觉剥离(独立评审 ①×M 的结构性封堵)。
+        const allowedView: VoteTarget[] = allowed.map(({ id, name, isHuman, alive }) => ({
+          id,
+          name,
+          isHuman,
+          alive,
+        }));
+        const result = await this.model.vote(buildAgentContext(game, voter), allowedView);
+        // 授权:目标合法性由确定性代码裁决,不信任模型返回值——越界/已出局/自投一律
+        // 回落到确定性首选合法目标,杜绝 resolveBallot 误淘汰已出局者的状态腐坏。
+        const targetId = allowed.some((p) => p.id === result.targetId)
+          ? result.targetId
+          : allowed[0].id;
         return {
           voterId: voter.id,
-          targetId: result.targetId,
+          targetId,
           reason: result.reason,
           round: game.round,
           ballot: game.ballot,

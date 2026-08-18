@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GameEngine } from './game-engine.js';
 import { FakeGameModel } from './test-utils.js';
-import type { AgentContext, Player } from './types.js';
+import type { AgentContext, VoteTarget } from './types.js';
 
 /**
  * B5 · 隐藏投票(OpenSpec 03 · Task 5.4)
@@ -24,7 +24,7 @@ const VOTE_MAP: Record<string, string> = {
 class SplitVoteModel extends FakeGameModel {
   async vote(
     context: AgentContext,
-    allowedTargets: Player[],
+    allowedTargets: VoteTarget[],
   ): Promise<{ targetId: string; reason: string }> {
     this.voteContexts.push(structuredClone(context));
     const want = VOTE_MAP[context.identity.playerId];

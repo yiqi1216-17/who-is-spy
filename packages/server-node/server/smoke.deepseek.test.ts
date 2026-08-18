@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { describe, expect, it } from 'vitest';
 import { DeepSeekClient, type GameModel, ModelError } from './model.js';
 import { GameEngine } from './game-engine.js';
-import type { AgentContext, GameReview, GameState, Player } from './types.js';
+import type { AgentContext, GameReview, GameState, VoteTarget } from './types.js';
 
 /**
  * §6.3 · 预算封顶 DeepSeek smoke 局(OpenSpec 03 · Task 6.3)
@@ -35,7 +35,7 @@ class BudgetCappedModel implements GameModel {
     this.tick();
     return this.inner.describe(context);
   }
-  async vote(context: AgentContext, allowed: Player[]): Promise<{ targetId: string; reason: string }> {
+  async vote(context: AgentContext, allowed: VoteTarget[]): Promise<{ targetId: string; reason: string }> {
     this.tick();
     return this.inner.vote(context, allowed);
   }

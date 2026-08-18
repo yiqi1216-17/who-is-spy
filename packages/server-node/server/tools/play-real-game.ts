@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { DeepSeekClient, type GameModel, ModelError } from '../model.js';
 import { GameEngine } from '../game-engine.js';
-import type { AgentContext, GameReview, GameState, Player, PublicGameState } from '../types.js';
+import type { AgentContext, GameReview, GameState, VoteTarget, PublicGameState } from '../types.js';
 
 /**
  * 真机 demo:用真实 DeepSeek 跑一整局到终局,打印**脱敏**公开 transcript。
@@ -35,7 +35,7 @@ class BudgetCappedModel implements GameModel {
     this.tick('describe');
     return this.inner.describe(c);
   }
-  async vote(c: AgentContext, t: Player[]): Promise<{ targetId: string; reason: string }> {
+  async vote(c: AgentContext, t: VoteTarget[]): Promise<{ targetId: string; reason: string }> {
     this.tick('vote');
     return this.inner.vote(c, t);
   }
