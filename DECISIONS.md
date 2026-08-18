@@ -5,10 +5,11 @@
 
 ## 0. 我选择的技术栈
 
-- [ ] Node(`packages/server-node`)
+- [x] Node(`packages/server-node`)
 - [ ] Go(`packages/server-go`)
 
-选择理由:
+选择理由:二次开发的策略层、评测适配器、trace、CLI 与运行时 schema 可统一在一套 TypeScript 生态里,
+类型贯通前后端;Go 侧保留为不变的外部契约对照(同一份语言无关契约 `contract/` 双向校验)。
 
 ## 1. 我完成了哪些任务线
 
@@ -42,8 +43,8 @@
 
 > 贴命令 + 关键输出(注意别带上密钥或完整密词)。
 
-- 契约(所选栈):`npm run contract:node` 或 `npm run contract:go` 的结果:
-- 域测试 / 构建结果:
+- 契约(所选栈):`npm run contract:node` → **28 通过 / 0 失败**(FakeModel 路径)。见 `docs/evidence/B0-baseline.md`。
+- 域测试 / 构建结果:`npm run test:node` → **6/6 通过**;`npm run build` → web(vite)+ server(tsc)**均通过**。B0 三绿。
 - 批量评测脚本的输出(指标表):
 - 故障注入 + 定位到具体一局 / 某一轮 / 某个 AI / 第几次尝试的示例:
 - 用真实模型完整跑一局的记录:
