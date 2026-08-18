@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { GameEngine } from './game-engine.js';
 import { FakeGameModel } from './test-utils.js';
-import type { AgentContext, GameModel, GameReview, GameState, Player } from './types.js';
+import type { GameModel } from './model.js';
+import type { AgentContext, GameReview, GameState, Player } from './types.js';
 
 /**
  * B0 特征化测试(OpenSpec 03 · Task 1.3)
