@@ -10,7 +10,7 @@
 
 ## 2. Establish schemas and domain state boundaries
 
-- [ ] 2.1 Write producer/consumer compatibility tests, then add versioned schemas for public state, events, Agent context, beliefs, strategies, model outputs, dataset records, hooks, traces, and reports.
+- [x] 2.1 Write producer/consumer compatibility tests, then add versioned schemas for public state, events, Agent context, beliefs, strategies, model outputs, dataset records, hooks, traces, and reports.
 - [ ] 2.2 Write legal/illegal transition-table tests, then route Node phases and actions through an explicit domain state machine without changing the public HTTP contract.
 - [ ] 2.3 Add migration fixtures proving incompatible persisted datasets, traces, replay envelopes, and reports fail with actionable version errors.
 
