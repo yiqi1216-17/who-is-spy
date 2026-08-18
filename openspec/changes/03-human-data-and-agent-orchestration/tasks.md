@@ -41,5 +41,5 @@
 
 - [x] 6.1 Run paired B0/B1/B2/B3 fixture ablations for sequential orchestration, human retrieval/prototypes, and beliefs/ranking using the same scenarios and seeds.
 - [x] 6.2 Prove pre-finale role/word, cross-Agent belief, complete-state, private-prompt, and unresolved-vote sentinels never cross model, hook, public DTO, or persisted artifact boundaries.
-- [ ] 6.3 Run Node tests, build, `contract:node`, strict OpenSpec validation, and a budget-capped DeepSeek smoke game; preserve redacted evidence and exact versions.
+- [x] 6.3 Run Node tests, build, `contract:node`, strict OpenSpec validation, and a budget-capped DeepSeek smoke game; preserve redacted evidence and exact versions.
 - [ ] 6.4 Document the shared event/report interfaces and residual risks required by changes 04 and 05, then request independent architecture and privacy review.

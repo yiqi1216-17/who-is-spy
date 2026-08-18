@@ -45,18 +45,26 @@
 
 证据:`packages/server-node/server/sentinel-sweep.test.ts`(7 用例)。
 
-## 门禁(本次 §6 提交时)
+## 门禁(§6 收尾时,exact versions)
+
+运行环境:node v24.18.0 · npm 11.16.0 · typescript 6.0.3 · vitest 4.1.10 · darwin-arm64。
+真机链路:`api.deepseek.com`,`DEEPSEEK_MODEL=deepseek-chat`(响应回显 `deepseek-v4-flash`)。
 
 | 门禁 | 命令 | 结果 |
 | --- | --- | --- |
 | 构建 | `npm run build`(server,`tsc --noEmit`) | ✅ 通过 |
-| 域测试 | `npm run test:node` | ✅ 17 文件 / 78 用例通过 |
+| 域测试 | `npm run test:node` | ✅ 18 文件 / 80 用例通过 / **0 跳过** |
 | 语言无关契约 | `npm run contract:node` | ✅ 28 通过 / 0 失败 |
 | 规格校验 | `openspec validate 03 --strict` | ✅ valid |
 
+## §6.3 真机链路(已覆盖)
+
+- **预算封顶 smoke**:`smoke.deepseek.test.ts`(MAX_MODEL_CALLS=24 防失控消耗)。密钥已写入
+  gitignore 的 `packages/server-node/.env`;真机 `api.deepseek.com` **通过**——真机描述不泄密词、
+  终局前不揭示他人身份。未配置时按 `isConfigured()` 优雅跳过(可移植)。
+- **完整一局脱敏 transcript**:`docs/evidence/03-6-real-game.md`(脚本 `server/tools/play-real-game.ts`,
+  真机 3 轮到终局,23/80 次调用)。四人设话风可辨、后发接住先发、平票触发第 2 张选票、秘密词全程 ▢▢。
+
 ## 尚未覆盖(诚实边界)
 
-- §6.3 的**预算封顶 DeepSeek smoke 局**harness 已落地(`smoke.deepseek.test.ts`,MAX_MODEL_CALLS=24
-  防失控消耗),依赖真实 `DEEPSEEK_API_KEY`;未配置时按 `isConfigured()` 优雅跳过(本次 1 skipped),
-  密钥就绪后自动生效并补录脱敏证据。要现场跑:提示符输入 `! echo 'DEEPSEEK_API_KEY=...' >> packages/server-node/.env`。
 - §6.1 中"人类检索/原型分布"的真实语料部分属 C 阶段(§3–§4 后半),此处以合成原型形态对照。
