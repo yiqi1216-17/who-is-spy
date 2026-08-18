@@ -46,11 +46,32 @@ export const MAX_DESCRIBE_ATTEMPTS = 3;
 
 export class GameEngine {
   private readonly games = new Map<string, GameState>();
+  /** 每局一条命令链:同一对局的命令串行执行,杜绝并发交错。 */
+  private readonly chains = new Map<string, Promise<unknown>>();
 
   constructor(
     private readonly model: GameModel,
     private readonly random: () => number = Math.random,
   ) {}
+
+  /**
+   * 每局守卫 + 原子提交(OpenSpec 03 · Task 5.6)。
+   * - 串行:同一 id 的命令排队执行,后一条命令看到的是前一条**已提交**的状态。
+   * - 原子:命令在一份 `structuredClone` 草稿上改动,**仅当成功**才整体写回;
+   *   中途抛错则草稿丢弃,已提交状态原样保留(回滚),与 CH-4 失败原子性同源。
+   */
+  private withGame<T>(id: string, fn: (draft: GameState) => Promise<T>): Promise<T> {
+    const run = (this.chains.get(id) ?? Promise.resolve()).then(async () => {
+      const committed = this.requireGame(id);
+      const draft = structuredClone(committed);
+      const result = await fn(draft);
+      this.games.set(id, draft); // 成功才提交
+      return result;
+    });
+    // 记录命令链(吞掉错误,避免一条命令失败阻断后续),但把真实结果交回调用者。
+    this.chains.set(id, run.then(() => undefined, () => undefined));
+    return run;
+  }
 
   createGame(): PublicGameState {
     const pair = chooseWordPair(this.random);
@@ -107,7 +128,10 @@ export class GameEngine {
   }
 
   async submitHumanDescription(id: string, text: string): Promise<PublicGameState> {
-    const game = this.requireGame(id);
+    return this.withGame(id, (game) => this.describeCommand(game, text));
+  }
+
+  private async describeCommand(game: GameState, text: string): Promise<PublicGameState> {
     this.assertAction(game, 'describe');
     const human = this.human(game);
     if (!human.alive) throw new GameRuleError('你已出局，请继续观战');
@@ -149,7 +173,10 @@ export class GameEngine {
   }
 
   async submitHumanVote(id: string, targetId: string): Promise<PublicGameState> {
-    const game = this.requireGame(id);
+    return this.withGame(id, (game) => this.voteCommand(game, targetId));
+  }
+
+  private async voteCommand(game: GameState, targetId: string): Promise<PublicGameState> {
     this.assertAction(game, 'vote');
     const human = this.human(game);
     if (!human.alive) throw new GameRuleError('你已出局，请继续观战');
@@ -173,7 +200,10 @@ export class GameEngine {
   }
 
   async continueAsSpectator(id: string): Promise<PublicGameState> {
-    const game = this.requireGame(id);
+    return this.withGame(id, (game) => this.spectateCommand(game));
+  }
+
+  private async spectateCommand(game: GameState): Promise<PublicGameState> {
     if (this.human(game).alive) throw new GameRuleError('你仍在场上，请亲自完成行动');
     if (game.phase === 'finished') return this.toPublic(game);
 

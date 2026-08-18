@@ -35,7 +35,7 @@
 - [x] 5.3 Write sequential-context tests proving every later speaker sees only earlier public same-round descriptions, then replace parallel generation with deterministic seat order.
 - [x] 5.4 Write hidden-vote tests proving later voters cannot observe unresolved votes while deterministic code retains target and ballot authority.
 - [x] 5.5 Write exact leak, obfuscation, similarity, self-repetition, correction, and exhaustion tests, then add the shared description quality policy.
-- [ ] 5.6 Write concurrent-command and rollback tests, then add the per-game guard and atomic working-state commit.
+- [x] 5.6 Write concurrent-command and rollback tests, then add the per-game guard and atomic working-state commit.
 
 ## 6. Prove the change and expose downstream contracts
 
