@@ -88,7 +88,12 @@
 > 贴命令 + 关键输出(注意别带上密钥或完整密词)。
 
 - 契约(所选栈):`npm run contract:node` → **28 通过 / 0 失败**(FakeModel 路径)。见 `docs/evidence/B0-baseline.md`。
-- 域测试 / 构建结果:`npm run test:node` → **6/6 通过**;`npm run build` → web(vite)+ server(tsc)**均通过**。B0 三绿。
-- 批量评测脚本的输出(指标表):
-- 故障注入 + 定位到具体一局 / 某一轮 / 某个 AI / 第几次尝试的示例:
-- 用真实模型完整跑一局的记录:
+- 域测试 / 构建结果:`npm run test:node` → **80 通过 / 0 跳过**(含真机 DeepSeek smoke);
+  `npm run build` → server(`tsc --noEmit`)**通过**。B0→§6 全程三绿。
+- §6 变更证明:配对消融表(顺序 0→3 / 人设 1→4 / 信念校准 0→>0)+ 哨兵×边界矩阵(5 哨兵 × 4 边界全拦截)。
+  见 `docs/evidence/03-6-proof.md`,证据测试 `ablation.test.ts`(3)/ `sentinel-sweep.test.ts`(7)。
+- 真机链路:预算封顶 DeepSeek smoke(`smoke.deepseek.test.ts`,MAX_MODEL_CALLS=24)已在真实
+  `api.deepseek.com` 通过——真机描述不泄密词、终局前不揭示他人身份;实际返回模型 `deepseek-v4-flash`。
+- 批量评测脚本的输出(指标表):(change 04)
+- 故障注入 + 定位到具体一局 / 某一轮 / 某个 AI / 第几次尝试的示例:(change 04 可观测层)
+- 用真实模型完整跑一局的记录:(下一步用真机 demo 脚本捕获,脱敏后补录)
