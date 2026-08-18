@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { buildAgentContext } from './agent-context.js';
 import type { GameModel } from './model.js';
+import { type GameAction, canAct, canTransition } from './state-machine.js';
 import type {
   Description,
   GameReview,
   GameState,
+  Phase,
   Player,
   PublicGameState,
   Role,
@@ -90,7 +92,7 @@ export class GameEngine {
 
   async submitHumanDescription(id: string, text: string): Promise<PublicGameState> {
     const game = this.requireGame(id);
-    this.assertPhase(game, 'describing');
+    this.assertAction(game, 'describe');
     const human = this.human(game);
     if (!human.alive) throw new GameRuleError('你已出局，请继续观战');
     const description = normalizeText(text);
@@ -118,7 +120,7 @@ export class GameEngine {
         playerId: item.playerId,
       })),
     );
-    game.phase = 'voting';
+    this.transitionTo(game, 'voting');
     game.ballot = 1;
     game.eligibleTargetIds = null;
     game.events.push({
@@ -132,7 +134,7 @@ export class GameEngine {
 
   async submitHumanVote(id: string, targetId: string): Promise<PublicGameState> {
     const game = this.requireGame(id);
-    this.assertPhase(game, 'voting');
+    this.assertAction(game, 'vote');
     const human = this.human(game);
     if (!human.alive) throw new GameRuleError('你已出局，请继续观战');
     this.validateVoteTarget(game, human, targetId);
@@ -174,7 +176,7 @@ export class GameEngine {
             playerId: item.playerId,
           })),
         );
-        game.phase = 'voting';
+        this.transitionTo(game, 'voting');
         game.ballot = 1;
         game.eligibleTargetIds = null;
       } else {
@@ -253,14 +255,14 @@ export class GameEngine {
     const winner = this.checkWinner(game);
     if (winner) {
       game.winner = winner;
-      game.phase = 'finished';
+      this.transitionTo(game, 'finished');
       game.review = await this.createReview(game);
       return;
     }
 
     game.round += 1;
     game.ballot = 1;
-    game.phase = 'describing';
+    this.transitionTo(game, 'describing');
     game.events.push({
       id: randomUUID(),
       type: 'system',
@@ -346,8 +348,19 @@ export class GameEngine {
     return game.players.find((player) => player.isHuman)!;
   }
 
-  private assertPhase(game: GameState, phase: GameState['phase']): void {
-    if (game.phase !== phase) throw new GameRuleError(`当前不在${phase === 'describing' ? '描述' : '投票'}阶段`);
+  /** 动作合法性经域状态机判定;非法动作复用原有阶段错误文案(HTTP 400)。 */
+  private assertAction(game: GameState, action: GameAction): void {
+    if (!canAct(game.phase, action)) {
+      throw new GameRuleError(`当前不在${action === 'describe' ? '描述' : '投票'}阶段`);
+    }
+  }
+
+  /** 所有相位切换的唯一入口:非法转移即引擎不变量被破坏(HTTP 500)。 */
+  private transitionTo(game: GameState, next: Phase): void {
+    if (!canTransition(game.phase, next)) {
+      throw new GameRuleError(`非法相位转移: ${game.phase} → ${next}`, 500);
+    }
+    game.phase = next;
   }
 
   private isFinished(game: GameState): boolean {
