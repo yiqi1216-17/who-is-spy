@@ -4,9 +4,9 @@
 
 ## 1. Freeze the brownfield baseline
 
-- [ ] 1.1 Run and record Node domain, HTTP, build, and `contract:node` results as B0; preserve one deterministic fixture transcript without changing behavior.
-- [ ] 1.2 Add numbered `DECISIONS.md` entries and a verification-evidence index for Agent suggestions, human corrections, commands, reports, privacy checks, and known risks.
-- [ ] 1.3 Capture B0 context shapes, strategy inputs, description ordering, policy behavior, and failure atomicity as characterization tests.
+- [x] 1.1 Run and record Node domain, HTTP, build, and `contract:node` results as B0; preserve one deterministic fixture transcript without changing behavior.
+- [x] 1.2 Add numbered `DECISIONS.md` entries and a verification-evidence index for Agent suggestions, human corrections, commands, reports, privacy checks, and known risks.
+- [x] 1.3 Capture B0 context shapes, strategy inputs, description ordering, policy behavior, and failure atomicity as characterization tests.
 
 ## 2. Establish schemas and domain state boundaries
 

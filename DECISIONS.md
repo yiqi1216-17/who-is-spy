@@ -24,10 +24,20 @@
 
 ## 2. Coding Agent 使用记录
 
-- 我用的工具(Cursor / Claude Code / TraeCode 等):
+- 我用的工具(Cursor / Claude Code / TraeCode 等):Claude Code(Opus)。全程 OpenSpec 规格驱动:
+  先冻结基线 → 特征化测试钉住现状 → 再落接缝,避免"匆匆跑通后返工"。
 - 哪些改动主要是 Agent 生成的(涉及哪些文件 / 大致范围):
+  - `docs/evidence/B0-baseline.md`(基线三绿证据 + 三处基线问题定位)。
+  - `packages/server-node/server/b0-characterization.test.ts`(5 条特征化测试)。
+  - 锁文件内网镜像 host → 公共 npm 源(仅改 `resolved` host,版本与 integrity 不变)。
 - 我人工审查和改动了哪些地方:
+  - 逐条核对特征化断言与真实基线行为一致(如 `Promise.all` 并行导致后发看不到同轮先发)。
+  - 把提交切成有意义的边界(基线导入 / 锁文件修复 / 证据 / 特征化测试),便于现场投屏讲 git log。
 - **Agent 有一处给错了或给得不够好,我是怎么发现并纠正的**:
+  - Agent 初次倾向"过度规划"并主张砍掉 OpenSpec 03 的人类数据线;我按题目"以效果为最终目标"
+    否决了该判断,改为"真实语料 + LLM 自博弈 + 已发表评测方法学"的务实路线,不引入治理开销。
+  - Agent 初次的泄题检查沿用基线的字面子串判断;我要求接缝阶段升级为
+    近义 / 同质 / 自我重复的 QualityPolicy(见 §3 与 OpenSpec 03 §5.5)。
 
 ## 3. 关键设计取舍
 
