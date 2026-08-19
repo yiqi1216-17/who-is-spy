@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>观测台 · 谁是卧底</title>
+    <!--
+      开发态观测台入口(题面任务线③的前端呈现:评测面板 / trace 视图 / 故障注入开关)。
+      本页**不在 vite 构建入口内**(build.rollupOptions 未登记,默认只打 index.html),
+      因此生产 bundle 结构上不含观测台——与服务端「生产不挂载 /api/ops/*」三重闸互补。
+      开发访问:http://localhost:5173/ops.html(横屏面板,与竖屏牌桌互不干扰)。
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #0d0c14;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ops-root"></div>
+    <script type="module" src="/src/ops/main.tsx"></script>
+  </body>
+</html>

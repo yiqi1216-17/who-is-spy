@@ -1,0 +1,579 @@
+/* 观测台样式(任务线③前端呈现)。横屏控制台,与竖屏牌桌视觉同源(暗色 + 鎏金)但更「机房」。 */
+
+.ops-root {
+  min-height: 100vh;
+  min-width: 960px; /* 横屏面板:桌面演示优先 */
+  background:
+    radial-gradient(90% 60% at 50% 0%, #17151f 0%, #0d0c14 70%),
+    #0d0c14;
+  color: #e8e4da;
+  font-family:
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei',
+    system-ui,
+    sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.ops-root .mono {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.ops-root .dim {
+  color: #8a8478;
+}
+
+/* —— 顶栏 —— */
+.ops-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 0.7rem 1.2rem;
+  background: rgba(13, 12, 20, 0.94);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(212, 175, 105, 0.25);
+}
+
+.ops-title {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.ops-mark {
+  color: #d4af69;
+  margin-right: 0.3rem;
+}
+
+.ops-devtag {
+  margin-left: 0.6rem;
+  font-size: 0.62rem;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.16em;
+  padding: 0.18rem 0.5rem;
+  border-radius: 5px;
+  background: rgba(181, 100, 60, 0.22);
+  color: #e0a06f;
+  border: 1px solid rgba(224, 160, 111, 0.4);
+  vertical-align: 2px;
+}
+
+.ops-tabs {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.ops-tabs button {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 228, 218, 0.18);
+  background: transparent;
+  color: #cfc8ba;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.ops-tabs button:hover {
+  border-color: rgba(212, 175, 105, 0.55);
+  color: #f0eadd;
+}
+
+.ops-tabs button.on {
+  background: linear-gradient(135deg, #b5643c, #d4874f);
+  border-color: transparent;
+  color: #1a120c;
+  font-weight: 600;
+}
+
+.ops-health {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: #b8b0a2;
+}
+
+.ops-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.ops-dot.ok {
+  background: #7dc98f;
+  box-shadow: 0 0 6px rgba(125, 201, 143, 0.7);
+}
+
+.ops-dot.warn {
+  background: #e0b45f;
+}
+
+.ops-dot.err {
+  background: #f0968f;
+}
+
+.ops-back {
+  margin-left: 0.8rem;
+  color: #d4af69;
+  text-decoration: none;
+  font-size: 0.8rem;
+}
+
+.ops-back:hover {
+  text-decoration: underline;
+}
+
+/* —— 主体两栏 —— */
+.ops-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1rem;
+  padding: 1rem 1.2rem 2rem;
+  align-items: start;
+}
+
+.ops-side {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: sticky;
+  top: 64px;
+}
+
+.ops-card {
+  background: rgba(20, 18, 28, 0.72);
+  border: 1px solid rgba(212, 175, 105, 0.18);
+  border-radius: 14px;
+  padding: 0.9rem 1rem 1rem;
+}
+
+.ops-card h3 {
+  margin: 0 0 0.7rem;
+  font-size: 0.86rem;
+  letter-spacing: 0.06em;
+  color: #d4af69;
+}
+
+.ops-pill {
+  font-size: 0.76rem;
+  line-height: 1.5;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  margin: 0 0 0.8rem;
+}
+
+.ops-pill.armed {
+  background: rgba(180, 60, 60, 0.18);
+  color: #f0968f;
+  border: 1px solid rgba(240, 150, 143, 0.4);
+  animation: ops-pulse 1.6s ease-in-out infinite;
+}
+
+.ops-pill.idle {
+  background: rgba(232, 228, 218, 0.06);
+  color: #b8b0a2;
+  border: 1px solid rgba(232, 228, 218, 0.12);
+}
+
+@keyframes ops-pulse {
+  50% {
+    border-color: rgba(240, 150, 143, 0.85);
+  }
+}
+
+.ops-field {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.45rem 0;
+  font-size: 0.8rem;
+  color: #cfc8ba;
+}
+
+.ops-field span {
+  flex-shrink: 0;
+  width: 4.2em;
+  color: #8a8478;
+}
+
+.ops-field.inline {
+  display: inline-flex;
+  margin: 0;
+}
+
+.ops-field.inline span {
+  width: auto;
+}
+
+.ops-field select,
+.ops-field input,
+.ops-toolbar select,
+.ops-toolbar input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8rem;
+  padding: 0.34rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(232, 228, 218, 0.2);
+  background: rgba(13, 12, 20, 0.8);
+  color: #e8e4da;
+}
+
+.ops-field select:focus-visible,
+.ops-field input:focus-visible,
+.ops-toolbar select:focus-visible,
+.ops-toolbar input:focus-visible,
+.ops-tabs button:focus-visible,
+.ops-actions button:focus-visible {
+  outline: 2px solid #d4af69;
+  outline-offset: 1px;
+}
+
+.ops-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  color: #cfc8ba;
+  margin: 0.5rem 0;
+  cursor: pointer;
+}
+
+.ops-check.inline {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.ops-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.ops-actions button,
+.ops-toolbar button {
+  font-size: 0.8rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+button.danger {
+  background: linear-gradient(135deg, #a03d3d, #c25a3f);
+  color: #f7ede6;
+}
+
+button.danger:hover {
+  filter: brightness(1.12);
+}
+
+button.primary {
+  background: linear-gradient(135deg, #b5643c, #d4874f);
+  color: #1a120c;
+  font-weight: 600;
+}
+
+button.primary:hover {
+  filter: brightness(1.1);
+}
+
+button.ghost {
+  background: transparent;
+  border-color: rgba(232, 228, 218, 0.25);
+  color: #cfc8ba;
+}
+
+button.ghost:hover {
+  border-color: rgba(212, 175, 105, 0.55);
+  color: #f0eadd;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.ops-note ol {
+  margin: 0 0 0.6rem;
+  padding-left: 1.2rem;
+  font-size: 0.78rem;
+  line-height: 1.7;
+  color: #cfc8ba;
+}
+
+.ops-note p {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
+.ops-error {
+  margin: 0.6rem 0 0;
+  font-size: 0.76rem;
+  color: #f0968f;
+}
+
+/* —— 右侧面板 —— */
+.ops-panel {
+  background: rgba(20, 18, 28, 0.55);
+  border: 1px solid rgba(212, 175, 105, 0.14);
+  border-radius: 14px;
+  padding: 0.9rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-height: 70vh;
+}
+
+.ops-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.ops-toolbar input[placeholder] {
+  flex: 0 1 260px;
+}
+
+.ops-stats {
+  margin-left: auto;
+  font-size: 0.74rem;
+  color: #8a8478;
+  white-space: nowrap;
+}
+
+.ops-stats em {
+  font-style: normal;
+}
+
+.ops-stats em.err {
+  color: #f0968f;
+}
+
+.ops-stats em.warn {
+  color: #e0b45f;
+}
+
+.ops-stats em.ok {
+  color: #7dc98f;
+}
+
+/* —— trace 表 —— */
+.ops-tablewrap {
+  overflow: auto;
+  max-height: calc(100vh - 220px);
+  border: 1px solid rgba(232, 228, 218, 0.1);
+  border-radius: 10px;
+}
+
+.ops-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+}
+
+.ops-table thead th {
+  position: sticky;
+  top: 0;
+  background: #171522;
+  color: #d4af69;
+  font-weight: 500;
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid rgba(212, 175, 105, 0.3);
+  white-space: nowrap;
+}
+
+.ops-table td {
+  padding: 0.38rem 0.6rem;
+  border-bottom: 1px solid rgba(232, 228, 218, 0.06);
+  white-space: nowrap;
+  color: #cfc8ba;
+}
+
+.ops-table tr.lineage-head td {
+  border-top: 1px solid rgba(212, 175, 105, 0.22);
+}
+
+.ops-table tr.out-error td {
+  background: rgba(180, 60, 60, 0.08);
+}
+
+.ops-table tr.out-rejected td {
+  background: rgba(224, 180, 95, 0.06);
+}
+
+.ops-empty {
+  text-align: center;
+  color: #8a8478;
+  padding: 2.4rem 1rem !important;
+  white-space: normal !important;
+}
+
+.ops-empty-lg {
+  text-align: center;
+  color: #8a8478;
+  padding: 4rem 1rem;
+  font-size: 0.85rem;
+}
+
+.ops-badge {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.68rem;
+  padding: 0.14rem 0.45rem;
+  border-radius: 5px;
+}
+
+.ops-badge.accepted {
+  background: rgba(125, 201, 143, 0.16);
+  color: #7dc98f;
+}
+
+.ops-badge.rejected {
+  background: rgba(224, 180, 95, 0.16);
+  color: #e0b45f;
+}
+
+.ops-badge.error {
+  background: rgba(240, 150, 143, 0.16);
+  color: #f0968f;
+}
+
+.ops-foot {
+  font-size: 0.7rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* —— 评测面板 —— */
+.ops-runs {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.ops-run {
+  font-size: 0.74rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 228, 218, 0.18);
+  background: transparent;
+  color: #cfc8ba;
+  cursor: pointer;
+}
+
+.ops-run.on {
+  border-color: rgba(212, 175, 105, 0.7);
+  color: #f0eadd;
+}
+
+.ops-run.fail {
+  border-color: rgba(240, 150, 143, 0.45);
+}
+
+.ops-gate {
+  font-size: 0.84rem;
+  line-height: 1.6;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+}
+
+.ops-gate.pass {
+  background: rgba(125, 201, 143, 0.1);
+  border: 1px solid rgba(125, 201, 143, 0.35);
+  color: #a9dcb6;
+}
+
+.ops-gate.fail {
+  background: rgba(180, 60, 60, 0.12);
+  border: 1px solid rgba(240, 150, 143, 0.4);
+  color: #f0b0aa;
+}
+
+.ops-gate ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.76rem;
+}
+
+.ops-gate code {
+  color: #f0968f;
+}
+
+.ops-scorecard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.ops-scorecard > .ops-dim {
+  margin: 0;
+  font-size: 0.74rem;
+}
+
+.ops-metricgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0.7rem;
+}
+
+.ops-metricgroup {
+  background: rgba(13, 12, 20, 0.55);
+  border: 1px solid rgba(232, 228, 218, 0.1);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+}
+
+.ops-metricgroup h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  color: #b8b0a2;
+  font-weight: 500;
+}
+
+.ops-metricgroup table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.ops-metricgroup td {
+  padding: 0.26rem 0;
+  color: #cfc8ba;
+}
+
+.ops-metricgroup td.val {
+  text-align: right;
+  color: #f0eadd;
+}
+
+.ops-metricgroup td:last-child {
+  text-align: right;
+  width: 4.5em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ops-pill.armed {
+    animation: none;
+  }
+
+  .ops-tabs button,
+  .ops-actions button,
+  .ops-toolbar button {
+    transition: none;
+  }
+}
