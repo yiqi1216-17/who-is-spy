@@ -6,6 +6,12 @@ const descriptionSchema = z.object({
   private_reasoning_summary: z.string().trim().min(1).max(120).optional(),
 });
 
+/** 上帝模式描述:除公开发言外，强制回传一句仅上帝可见的内心独白。 */
+const godDescribeSchema = z.object({
+  description: z.string().trim().min(2).max(60),
+  inner_monologue: z.string().trim().min(1).max(60),
+});
+
 const voteSchema = z.object({
   targetId: z.string().min(1),
   reason: z.string().trim().min(2).max(80),
@@ -41,6 +47,12 @@ export interface GameModel {
   describe(context: AgentContext): Promise<string>;
   vote(context: AgentContext, allowedTargets: VoteTarget[]): Promise<{ targetId: string; reason: string }>;
   review(game: GameState): Promise<GameReview>;
+  /**
+   * 上帝模式:在给出公开描述的同时,回传一句仅「上帝旁观者」可见的内心 OS(inner_monologue)。
+   * **可选**——只有上帝模式需要;缺省实现可回退为 describe + 空 OS。OS 绝不进入任何 agent 的上下文,
+   * 也绝不落盘(见 types.ts · GodGameState 的隔离说明)。
+   */
+  describeWithThought?(context: AgentContext): Promise<{ text: string; thought: string }>;
 }
 
 export class DeepSeekClient implements GameModel {
@@ -94,6 +106,49 @@ export class DeepSeekClient implements GameModel {
       }
     }
     throw new ModelError('AI 未能生成合规描述，已自动重试；请再试一次', lastError);
+  }
+
+  /**
+   * 上帝模式描述:公开发言 + 一句只对上帝可见的内心独白。
+   * 与 describe 同源、但独立 prompt(要求第一人称、可流露真实意图/伪装心理),
+   * 因此不改动经契约验证的 describe 路径。OS 只回给引擎汇入上帝 DTO,绝不发给其他玩家。
+   */
+  async describeWithThought(context: AgentContext): Promise<{ text: string; thought: string }> {
+    const { strategy } = context;
+    const messages: ChatMessage[] = [
+      {
+        role: 'system',
+        content:
+          '你正在玩“谁是卧底”。只依据收到的私有身份、自己的词和公开信息行动。绝不说出词语本身，不虚构其他玩家信息。' +
+          '用自然、含蓄、像真人的中文描述，避免每轮重复角度。' +
+          `请贴合你的策略人设“${strategy.persona}”：倾向手法为「${strategy.tactics.join('、')}」；` +
+          `具体度约 ${fmt(strategy.specificity)}、新颖度约 ${fmt(strategy.novelty)}、冒险度约 ${fmt(strategy.risk)}。` +
+          '除公开描述外，另给一句仅“上帝旁观者”可见的内心独白 inner_monologue：第一人称、不超过 30 个汉字，' +
+          '可流露你此刻的真实意图与心理（卧底的伪装与试探 / 平民的怀疑对象与依据）。它绝不会发送给其他任何玩家。只输出 JSON。',
+      },
+      {
+        role: 'user',
+        content: JSON.stringify({
+          task: '给出本轮公开描述 description(2–60 字符，不能包含自己的词)，以及一句内心独白 inner_monologue(≤30 汉字)。',
+          context,
+          output: { description: 'string', inner_monologue: 'string' },
+        }),
+      },
+    ];
+
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const result = godDescribeSchema.parse(await this.chatJson(messages));
+        if (result.description.includes(context.identity.word)) {
+          throw new Error('描述包含秘密词');
+        }
+        return { text: result.description, thought: result.inner_monologue };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw new ModelError('AI 未能生成合规描述（上帝模式），已自动重试；请再试一次', lastError);
   }
 
   async vote(context: AgentContext, allowedTargets: VoteTarget[]): Promise<{ targetId: string; reason: string }> {

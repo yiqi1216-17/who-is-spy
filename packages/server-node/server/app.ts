@@ -81,6 +81,25 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
     }
   });
 
+  // —— 上帝模式(附加端点,不在冻结契约内)——
+  // 一桌全 AI 旁观对局,一次性解算到终局并回传含内心 OS 的上帝投影。
+  // 独立 DTO(GodGameState),与 /api/games 的信息隔离不变量互不影响。
+  app.post('/api/god-games', async (_request, response, next) => {
+    try {
+      response.status(201).json(await engine.createGodGame());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/god-games/:id', (request, response, next) => {
+    try {
+      response.json(engine.getGodGame(request.params.id));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   if (process.env.NODE_ENV === 'production') {
     const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
     const distDirectory = path.resolve(currentDirectory, '../../web/dist');

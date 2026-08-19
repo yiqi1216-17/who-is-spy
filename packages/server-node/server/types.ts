@@ -81,6 +81,49 @@ export interface PublicGameState {
   model: string;
 }
 
+/**
+ * 上帝模式投影(附加能力,**独立于**冻结契约的 PublicGameState)
+ *
+ * 上帝模式是一桌**全 AI**(4 个 agent)自动对局的旁观视角:人类是「上帝」,能看见
+ * 每个 agent 的公开发言 + 一句仅上帝可见的**内心 OS**(inner_monologue)。
+ *
+ * 关键隔离(与契约信息隔离同源、并未削弱):
+ *  - 每个 agent 内部**仍**只经 buildAgentContext 的允许列拿到自己的身份/词,读不到他人身份;
+ *  - 内心 OS 只汇入这份**上帝 DTO** 供旁观者观看,**绝不**进入任何 agent 的上下文、**绝不**落盘;
+ *  - 这是一条独立端点(/api/god-games)与独立 DTO,契约冻结的 PublicGameState 不受影响。
+ */
+export interface GodPlayerView {
+  id: string;
+  name: string;
+  avatar: string;
+  alive: boolean;
+  role: Role;
+  word: string;
+  strategy: StrategyView;
+}
+
+/** 一句仅上帝可见的内心独白,锚定到某轮某个 agent 的发言。 */
+export interface GodThought {
+  round: number;
+  playerId: string;
+  text: string;
+}
+
+export interface GodGameState {
+  id: string;
+  phase: Phase;
+  round: number;
+  ballot: number;
+  players: GodPlayerView[];
+  descriptions: Description[];
+  votes: Vote[];
+  events: GameEvent[];
+  thoughts: GodThought[];
+  winner: Role | null;
+  review: GameReview | null;
+  model: string;
+}
+
 /** 策略投影:只暴露渲染所需字段,不含来源/样本 ID 等元数据。 */
 export interface StrategyView {
   persona: string;

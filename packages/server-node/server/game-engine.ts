@@ -15,6 +15,8 @@ import type {
   Description,
   GameReview,
   GameState,
+  GodGameState,
+  GodThought,
   Phase,
   Player,
   PublicGameState,
@@ -23,6 +25,7 @@ import type {
   VoteTarget,
 } from './types.js';
 import { chooseWordPair } from './words.js';
+import { strategyForAgent } from './strategies.js';
 
 const AI_PROFILES = [
   { name: '阿序', avatar: '序', style: '谨慎观察' },
@@ -78,6 +81,14 @@ export class GameEngine {
    * 独立于 GameState,故不随 structuredClone 草稿流动,也不被 toPublic 序列化。
    */
   private readonly beliefs = new Map<string, Map<string, Belief>>();
+
+  /**
+   * 上帝模式对局(全 AI 旁观)独立存储,与人类局的 `games` 完全隔离:
+   * 不经 `/api/games` 出口,故不可能被当作 PublicGameState 取回而误揭身份。
+   * `godThoughts` 保存每轮每个 agent 的内心 OS —— 只汇入上帝 DTO,绝不进他人上下文。
+   */
+  private readonly godGames = new Map<string, GameState>();
+  private readonly godThoughts = new Map<string, GodThought[]>();
 
   /** 引擎级 correlationId 单调计数(仅在注入 obs 时启用)。 */
   private corr = 0;
@@ -406,6 +417,136 @@ export class GameEngine {
     return this.toPublic(game);
   }
 
+  // ——————————————————————————————————————————————————————————————————————
+  // 上帝模式(附加能力):一桌全 AI 旁观对局 + 内心 OS。
+  // 走独立端点(/api/god-games)与独立 DTO(GodGameState),**绝不**触碰冻结契约的
+  // /api/games 与 PublicGameState;隔离不变量照旧——每个 agent 内部仍只经
+  // buildAgentContext 拿到自己的身份/词,内心 OS 只汇入上帝 DTO,绝不进他人上下文、绝不落盘。
+  // ——————————————————————————————————————————————————————————————————————
+
+  /**
+   * 创建并**一次性推进到终局**的全 AI 上帝局(呼应 continueAsSpectator 的整段解算):
+   * 4 个 agent(复用四种策略人设,1 名卧底)自动描述/投票,逐轮采集每个 agent 的内心 OS。
+   * 复用 generateVotes / resolveBallot / checkWinner / createReview —— 裁决逻辑单一来源,零漂移。
+   */
+  async createGodGame(): Promise<GodGameState> {
+    const game = this.buildGodGame();
+    const thoughts: GodThought[] = [];
+    let safety = 0;
+    while (!this.isFinished(game) && safety < 12) {
+      safety += 1;
+      if (game.phase === 'describing') {
+        const produced: Description[] = [];
+        // 确定性座次串行:后发 agent 能读到本轮已公开的先发描述(与人类局同源)。
+        for (const agent of game.players.filter((player) => player.alive)) {
+          const visible = [...game.descriptions, ...produced];
+          const contextGame: GameState = { ...game, descriptions: visible };
+          const { text, thought } = await this.gatedDescribe(contextGame, agent, visible, true);
+          produced.push({ playerId: agent.id, text, round: game.round });
+          if (thought) thoughts.push({ round: game.round, playerId: agent.id, text: thought });
+        }
+        game.descriptions.push(...produced);
+        game.events.push(
+          ...produced.map((item) => ({
+            id: randomUUID(),
+            type: 'description' as const,
+            text: item.text,
+            round: game.round,
+            playerId: item.playerId,
+          })),
+        );
+        this.transitionTo(game, 'voting');
+        game.ballot = 1;
+        game.eligibleTargetIds = null;
+      } else {
+        const votes = await this.generateVotes(game);
+        game.votes.push(...votes);
+        await this.resolveBallot(game, votes);
+      }
+    }
+    if (safety >= 12 && !this.isFinished(game)) {
+      throw new GameRuleError('上帝对局轮次异常，请重开', 500);
+    }
+    this.godGames.set(game.id, game);
+    this.godThoughts.set(game.id, thoughts);
+    return this.toPublicGod(game, thoughts);
+  }
+
+  getGodGame(id: string): GodGameState {
+    const game = this.godGames.get(id);
+    const thoughts = this.godThoughts.get(id);
+    if (!game || !thoughts) throw new GameRuleError('上帝对局不存在或已过期', 404);
+    return this.toPublicGod(game, thoughts);
+  }
+
+  /** 组建一桌全 AI(4 席)上帝局:复用词库与四种策略座次;确定性地放入 1 名卧底。 */
+  private buildGodGame(): GameState {
+    const pair = chooseWordPair(this.random);
+    const undercoverIndex = Math.floor(this.random() * AI_PROFILES.length);
+    const swapWords = this.random() > 0.5;
+    const civilianWord = pair[swapWords ? 1 : 0];
+    const undercoverWord = pair[swapWords ? 0 : 1];
+    const players: Player[] = AI_PROFILES.map((profile, index) => {
+      const role: Role = index === undercoverIndex ? 'undercover' : 'civilian';
+      return {
+        id: `ai-${index + 1}`,
+        name: profile.name,
+        avatar: profile.avatar,
+        isHuman: false,
+        role,
+        word: role === 'undercover' ? undercoverWord : civilianWord,
+        alive: true,
+      };
+    });
+    return {
+      id: randomUUID(),
+      phase: 'describing',
+      round: 1,
+      ballot: 1,
+      players,
+      descriptions: [],
+      votes: [],
+      events: [
+        {
+          id: randomUUID(),
+          type: 'system',
+          text: '密词已发放。四位 agent 将依次描述——上帝能看见他们各自的内心。',
+          round: 1,
+        },
+      ],
+      eligibleTargetIds: null,
+      winner: null,
+      review: null,
+      createdAt: Date.now(),
+    };
+  }
+
+  /** 上帝投影:旁观者看得见全部身份/词/策略与内心 OS(这正是上帝模式的意义所在)。 */
+  private toPublicGod(game: GameState, thoughts: GodThought[]): GodGameState {
+    return {
+      id: game.id,
+      phase: game.phase,
+      round: game.round,
+      ballot: game.ballot,
+      players: game.players.map((player) => ({
+        id: player.id,
+        name: player.name,
+        avatar: player.avatar,
+        alive: player.alive,
+        role: player.role,
+        word: player.word,
+        strategy: strategyForAgent(player),
+      })),
+      descriptions: game.descriptions,
+      votes: game.votes,
+      events: game.events,
+      thoughts,
+      winner: game.winner,
+      review: game.review,
+      model: this.model.model,
+    };
+  }
+
   private async generateDescriptions(game: GameState): Promise<Description[]> {
     const agents = game.players.filter((player) => !player.isHuman && player.alive);
     // 确定性座次串行:每个后发 Agent 都能看到本轮已公开的先发描述(人类 + 更早座次的 AI),
@@ -429,6 +570,20 @@ export class GameEngine {
     agent: Player,
     visible: Description[],
   ): Promise<string> {
+    return (await this.gatedDescribe(contextGame, agent, visible, false)).text;
+  }
+
+  /**
+   * 共享质量门:有界重试(correction)→ 穷尽即抛错(exhaustion);策略是纯函数、模型无关。
+   * `wantThought` 为真时走 `describeWithThought` 额外取回内心 OS(上帝模式);其余判定、trace
+   * 世系与人类局**逐字节一致**——单一实现,零逻辑漂移(反转 CH-3)。
+   */
+  private async gatedDescribe(
+    contextGame: GameState,
+    agent: Player,
+    visible: Description[],
+    wantThought: boolean,
+  ): Promise<{ text: string; thought: string }> {
     // 同轮他人描述 → 同质判定;本 Agent 更早轮次自述 → 自我重复判定。
     const priorPublicTexts = visible
       .filter((d) => d.round === contextGame.round && d.playerId !== agent.id)
@@ -442,7 +597,12 @@ export class GameEngine {
     let lastCode: QualityCode = 'too_short';
     for (let attempt = 1; attempt <= MAX_DESCRIBE_ATTEMPTS; attempt += 1) {
       const started = this.obs?.now?.();
-      const text = await this.model.describe(buildAgentContext(contextGame, agent));
+      const context = buildAgentContext(contextGame, agent);
+      // 上帝模式取回 {text, thought};人类局仍走原 describe(thought 恒为空),行为不变。
+      const { text, thought } =
+        wantThought && this.model.describeWithThought
+          ? await this.model.describeWithThought(context)
+          : { text: await this.model.describe(context), thought: '' };
       const verdict = evaluateDescription({
         text,
         secretWord: agent.word,
@@ -452,7 +612,7 @@ export class GameEngine {
       if (verdict.ok) {
         // 被接受:公开动作可由事件复放,trace 不留文本(design.md §5)。
         this.emitDescribeTrace(correlationId, contextGame.round, agent.id, attempt, 'accepted', started);
-        return text;
+        return { text, thought };
       }
       // 被拒私有候选:只留不可逆指纹 + 质量短码(§3.3),原文即刻丢弃、绝不入 trace。
       const digest = safeDigest(text);

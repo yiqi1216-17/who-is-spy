@@ -57,6 +57,19 @@ export class TracedModel implements GameModel {
     );
   }
 
+  /**
+   * 上帝模式描述:与 describe 同一条 withRetry + trace 世系(boundary 仍为 model.describe)。
+   * 若内层模型未实现该可选能力,回退为 describe + 空 OS,保证装饰器对任意 GameModel 都安全。
+   */
+  describeWithThought(context: AgentContext): Promise<{ text: string; thought: string }> {
+    return this.run('model.describe', context.game.round, context.identity.playerId, async () => {
+      if (this.inner.describeWithThought) {
+        return this.inner.describeWithThought(context);
+      }
+      return { text: await this.inner.describe(context), thought: '' };
+    });
+  }
+
   vote(
     context: AgentContext,
     allowedTargets: VoteTarget[],

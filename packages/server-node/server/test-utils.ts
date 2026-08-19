@@ -31,6 +31,16 @@ export class FakeGameModel implements GameModel {
     return FAKE_DESCRIBE_LINES[index];
   }
 
+  /** 上帝模式:复用确定性描述,并按角色给一句确定性的内心 OS(卧底/平民口吻不同)。 */
+  async describeWithThought(context: AgentContext): Promise<{ text: string; thought: string }> {
+    const text = await this.describe(context);
+    const thought =
+      context.identity.role === 'undercover'
+        ? `我的词也许和多数人不同，先稳住，别露破绽。（第 ${context.game.round} 轮）`
+        : `顺着大家的方向再确认一下谁最偏。（第 ${context.game.round} 轮）`;
+    return { text, thought };
+  }
+
   async vote(
     context: AgentContext,
     allowedTargets: VoteTarget[],
