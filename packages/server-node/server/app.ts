@@ -62,6 +62,19 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
     }
   });
 
+  // —— 高光时刻(OpenSpec 05-H · 任务 5.2/5.3/5.4)——
+  // 附加端点、不改冻结契约:确定性检测的一束多样时刻,每张卡片援引公开事件 id。
+  // 终局门禁:未终局返回 { available:false, cards:[] };默认剧透安全(结构上无 role/word);
+  // 仅 ?spoilers=1 且已终局时才附 spoiler 层(身份/密词/结构化信念增量)。
+  app.get('/api/games/:id/highlights', (request, response, next) => {
+    try {
+      const revealSpoilers = request.query.spoilers === '1' || request.query.spoilers === 'true';
+      response.json(engine.getHighlights(request.params.id, revealSpoilers));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post('/api/games/:id/describe', async (request, response, next) => {
     try {
       const input = descriptionInput.parse(request.body);

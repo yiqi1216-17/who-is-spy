@@ -32,6 +32,7 @@ import {
   type EnvelopeListener,
   type StreamEnvelope,
 } from './stream.js';
+import { type HighlightReel, buildHighlights } from './highlights.js';
 
 const AI_PROFILES = [
   { name: '阿序', avatar: '序', style: '谨慎观察' },
@@ -323,6 +324,29 @@ export class GameEngine {
    */
   reconstructReplay(id: string): ReconstructedTimeline {
     return reconstructTimeline(this.getReplayLog(id));
+  }
+
+  /**
+   * 高光时刻(OpenSpec 05-H · 任务 5.3/5.4 · design 决策 8):确定性检测 → 忠实性闸 → 排名成束。
+   *
+   * **终局门禁(任务 5.2)**:终局揭晓前一律返回 `{ available:false, cards:[] }` ——
+   * 检测器需读终局身份(谁是卧底/是否指对)才能提名,故未终局不解锁任何时刻。
+   * `revealSpoilers` 仅在终局路径可为 true,且身份/密词/结构化信念增量只落在 spoiler 层;
+   * 默认卡片结构上不含 role/word。信念快照取自私有 beliefs(无自由文本 CoT),仅随 spoiler 附出。
+   */
+  getHighlights(id: string, revealSpoilers = false): HighlightReel {
+    const game = this.requireGame(id);
+    if (game.phase !== 'finished') return { available: false, cards: [] };
+    return buildHighlights(
+      {
+        players: game.players,
+        descriptions: game.descriptions,
+        votes: game.votes,
+        events: game.events,
+        beliefs: this.beliefs.get(id),
+      },
+      { revealSpoilers },
+    );
   }
 
   /**
