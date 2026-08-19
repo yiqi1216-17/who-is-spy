@@ -2368,3 +2368,26 @@ p {
   font-size: 0.9rem;
   color: var(--ink-2);
 }
+
+/* —— 观测台入口(仅 DEV 渲染;生产构建静态消除,不会出现)—— */
+.ops-entry {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 60;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(13, 12, 20, 0.78);
+  border: 1px solid rgba(212, 175, 105, 0.4);
+  color: #d4af69;
+  text-decoration: none;
+  backdrop-filter: blur(6px);
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+
+.ops-entry:hover {
+  opacity: 1;
+}

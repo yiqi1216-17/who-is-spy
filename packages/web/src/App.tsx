@@ -316,6 +316,12 @@ export function App() {
     <div className="app-frame">
       <div className="paper-noise" />
       <main className="stage">{screen}</main>
+      {/* 观测台入口(任务线③前端呈现):仅 DEV 可见;生产构建里整段被静态消除。 */}
+      {import.meta.env.DEV && (
+        <a className="ops-entry" href="/ops.html" title="评测面板 · trace 视图 · 故障注入(仅开发环境)">
+          ◉ 观测台
+        </a>
+      )}
     </div>
   );
 }
