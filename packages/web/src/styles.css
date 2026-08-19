@@ -1669,6 +1669,202 @@ p {
 }
 
 /* =========================================================================
+   高光时刻(任务 5.4)—— 证据接地的一小束卡片,默认剧透安全,可开剧透层。
+   ========================================================================= */
+.hl-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s3);
+}
+.spoiler-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 8px;
+  border-radius: var(--r-full);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  transition: all var(--d-fast);
+}
+.spoiler-toggle .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--line-strong);
+  transition: all var(--d-fast);
+}
+.spoiler-toggle.on {
+  color: #f3ead9;
+  background: var(--rust-dark);
+  border-color: var(--rust-dark);
+}
+.spoiler-toggle.on .dot {
+  background: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 161, 90, 0.28);
+}
+.hl-empty {
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  border: 1px dashed var(--line-strong);
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+.hl-reel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+.hl-card {
+  position: relative;
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--hl, var(--gold));
+  box-shadow: var(--sh-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.hl-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: var(--hl, var(--gold));
+  background: color-mix(in srgb, var(--hl, var(--gold)) 14%, transparent);
+}
+.hl-round {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+}
+.hl-title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+.hl-caption {
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.hl-quote {
+  position: relative;
+  margin: 2px 0;
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-sm, 10px);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.hl-quote .who {
+  display: inline-block;
+  margin-right: 6px;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  color: var(--hl, var(--rust));
+}
+.hl-measures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin-top: 2px;
+}
+.hl-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-size: 0.66rem;
+  color: var(--ink-soft);
+}
+.hl-stat b {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink);
+}
+.hl-cite {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  opacity: 0.8;
+}
+.hl-spoiler {
+  margin-top: var(--s2);
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  background: var(--ink);
+  color: #e9ddc8;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.hl-spoiler p {
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+.hl-spoiler-tag {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  background: var(--rust);
+  color: #fff;
+}
+.hl-reveals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hl-reveal {
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  font-size: 0.66rem;
+  background: rgba(239, 233, 221, 0.08);
+  border: 1px solid var(--line-light-strong);
+}
+.hl-reveal.undercover {
+  background: rgba(182, 77, 49, 0.24);
+  border-color: rgba(182, 77, 49, 0.5);
+  color: #f4c9b6;
+}
+.hl-beliefs {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: rgba(233, 221, 200, 0.7);
+}
+
+/* =========================================================================
    双模式 · 上帝视角(任务 #26)
    —— 与玩家剧场同底(play/arena/spotlight/dock),叠加全知层:身份徽记 + 内心 OS。
    ========================================================================= */

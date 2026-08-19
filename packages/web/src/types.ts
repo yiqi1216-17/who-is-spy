@@ -101,3 +101,60 @@ export interface GodGameState {
   review: GameReview | null;
   model: string;
 }
+
+// —— 高光时刻(OpenSpec 05-H · 任务 5.3/5.4;与服务端 highlights.ts 同源) ——
+
+export type HighlightType =
+  | 'decisive_vote'
+  | 'consensus_flip'
+  | 'self_save'
+  | 'lone_correct_read'
+  | 'undercover_blend'
+  | 'callback'
+  | 'novel_safe_metaphor';
+
+export interface HighlightQuote {
+  playerId: string;
+  round: number;
+  text: string;
+  eventId?: string;
+}
+
+export interface HighlightVoteRef {
+  voterId: string;
+  targetId: string;
+  round: number;
+  ballot: number;
+}
+
+export interface HighlightMeasure {
+  label: string;
+  before?: number;
+  after?: number;
+  value?: number;
+}
+
+/** 剧透层:仅终局 + ?spoilers=1 时随卡片附出(身份/密词/结构化信念增量,无自由文本)。 */
+export interface HighlightSpoiler {
+  note: string;
+  roleReveals?: Array<{ playerId: string; role: Role; word: string }>;
+  beliefDeltas?: Array<{ agentId: string; targetId: string; before: number; after: number }>;
+}
+
+export interface HighlightCard {
+  id: string;
+  type: HighlightType;
+  round: number;
+  title: string;
+  caption: string;
+  citedEventIds: string[];
+  citedVotes: HighlightVoteRef[];
+  quotes: HighlightQuote[];
+  measures: HighlightMeasure[];
+  spoiler?: HighlightSpoiler;
+}
+
+export interface HighlightReel {
+  available: boolean;
+  cards: HighlightCard[];
+}

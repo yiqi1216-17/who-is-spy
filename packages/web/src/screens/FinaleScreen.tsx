@@ -1,10 +1,42 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { ChevronDown, Compass, Crown, RotateCcw, ScrollText, Sparkles, UsersRound } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  ChevronDown,
+  Compass,
+  Crosshair,
+  Crown,
+  EyeOff,
+  Film,
+  Link2,
+  RotateCcw,
+  Scale,
+  ScrollText,
+  ShieldCheck,
+  Shuffle,
+  Sparkle,
+  Sparkles,
+  Star,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react';
 import { characterFor } from '../characters';
 import { Portrait } from '../art/portraits';
-import type { PublicGameState, Role } from '../types';
+import { api } from '../api';
+import { citationLabel, formatMeasure, metaFor } from '../highlights';
+import type { HighlightCard, HighlightReel, PublicGameState, Role } from '../types';
 
-type Tab = 'identity' | 'review' | 'ballot';
+type Tab = 'identity' | 'highlights' | 'review' | 'ballot';
+
+/** 图标名 → lucide 组件(highlights.ts 只存名字,保持其无 JSX 依赖)。 */
+const HL_ICONS: Record<string, LucideIcon> = {
+  Scale,
+  Shuffle,
+  ShieldCheck,
+  Crosshair,
+  EyeOff,
+  Link2,
+  Sparkle,
+  Star,
+};
 
 /**
  * 终局复盘(OpenSpec 05-H · 任务 3.1/6.x)
@@ -39,11 +71,13 @@ export function FinaleScreen({ game, onRestart }: { game: PublicGameState; onRes
         <div className="finale-body">
           <div className="view-switch" role="tablist" aria-label="复盘视图">
             <Tabber tab={tab} value="identity" onSelect={setTab} icon={<UsersRound size={14} />} label="身份" />
+            <Tabber tab={tab} value="highlights" onSelect={setTab} icon={<Film size={14} />} label="高光" />
             <Tabber tab={tab} value="review" onSelect={setTab} icon={<Compass size={14} />} label="复盘" />
             <Tabber tab={tab} value="ballot" onSelect={setTab} icon={<ScrollText size={14} />} label="票局" />
           </div>
 
           {tab === 'identity' && <IdentityView game={game} />}
+          {tab === 'highlights' && <HighlightsView game={game} />}
           {tab === 'review' && <ReviewView game={game} />}
           {tab === 'ballot' && <BallotView game={game} />}
         </div>
@@ -241,6 +275,141 @@ function RoundAccordion({
               <b>结果</b>
               {event.text}
             </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * 高光时刻(任务 5.4):终局取一小束证据接地的时刻卡片。
+ * 默认剧透安全(结构上无 role/word);「剧透」开关打开后才二次拉取 ?spoilers=1,
+ * 揭晓身份/密词/结构化信念增量 —— 与服务端终局门禁同源。
+ */
+function HighlightsView({ game }: { game: PublicGameState }) {
+  const [spoilers, setSpoilers] = useState(false);
+  const [reel, setReel] = useState<HighlightReel | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReel(null);
+    setError(null);
+    api
+      .highlights(game.id, spoilers)
+      .then((data) => {
+        if (!cancelled) setReel(data);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : '高光加载失败');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [game.id, spoilers]);
+
+  const nameOf = (id: string) => characterFor(id).name;
+
+  return (
+    <section>
+      <div className="hl-head">
+        <p className="section-label" style={{ marginBottom: 0 }}>
+          <span>◆</span> 高光时刻 · 证据接地
+        </p>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={spoilers}
+          className={`spoiler-toggle ${spoilers ? 'on' : ''}`}
+          onClick={() => setSpoilers((value) => !value)}
+        >
+          <span className="dot" />
+          {spoilers ? '剧透已开' : '剧透'}
+        </button>
+      </div>
+
+      {error && <p className="hl-empty">高光加载失败,稍后重开可见。</p>}
+      {!error && reel === null && <p className="hl-empty">正在挑选本局最值得回看的瞬间…</p>}
+      {!error && reel !== null && reel.cards.length === 0 && (
+        <p className="hl-empty">这局节奏平稳,没有触发值得单独定格的高光——不凑数,只呈现真实发生过的时刻。</p>
+      )}
+
+      <div className="hl-reel">
+        {reel?.cards.map((card) => (
+          <HighlightCardView key={card.id} card={card} nameOf={nameOf} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HighlightCardView({ card, nameOf }: { card: HighlightCard; nameOf: (id: string) => string }) {
+  const meta = metaFor(card.type);
+  const Icon = HL_ICONS[meta.icon] ?? Star;
+  return (
+    <article className="hl-card" style={{ ['--hl' as string]: `var(${meta.accent})` }}>
+      <header className="hl-top">
+        <span className="hl-badge">
+          <Icon size={13} />
+          {meta.label}
+        </span>
+        <span className="hl-round">R{String(card.round).padStart(2, '0')}</span>
+      </header>
+      <h3 className="hl-title">{card.title}</h3>
+      <p className="hl-caption">{card.caption}</p>
+
+      {card.quotes.map((quote, index) => (
+        <blockquote className="hl-quote" key={index}>
+          <span className="who">{nameOf(quote.playerId)}</span>
+          {quote.text}
+        </blockquote>
+      ))}
+
+      {card.measures.length > 0 && (
+        <div className="hl-measures">
+          {card.measures.map((measure, index) => (
+            <span className="hl-stat" key={index}>
+              <b>{formatMeasure(measure)}</b>
+              {measure.label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <footer className="hl-cite">{citationLabel(card)}</footer>
+
+      {card.spoiler && <SpoilerPanel spoiler={card.spoiler} nameOf={nameOf} />}
+    </article>
+  );
+}
+
+function SpoilerPanel({
+  spoiler,
+  nameOf,
+}: {
+  spoiler: NonNullable<HighlightCard['spoiler']>;
+  nameOf: (id: string) => string;
+}) {
+  return (
+    <div className="hl-spoiler">
+      <span className="hl-spoiler-tag">剧透</span>
+      <p>{spoiler.note}</p>
+      {spoiler.roleReveals && spoiler.roleReveals.length > 0 && (
+        <div className="hl-reveals">
+          {spoiler.roleReveals.map((reveal) => (
+            <span className={`hl-reveal ${reveal.role}`} key={reveal.playerId}>
+              {nameOf(reveal.playerId)} · {roleName(reveal.role)} · {reveal.word}
+            </span>
+          ))}
+        </div>
+      )}
+      {spoiler.beliefDeltas && spoiler.beliefDeltas.length > 0 && (
+        <div className="hl-beliefs">
+          {spoiler.beliefDeltas.map((delta, index) => (
+            <span key={index}>
+              {nameOf(delta.agentId)} 对 {nameOf(delta.targetId)} 的怀疑 {delta.before} → {delta.after}
+            </span>
           ))}
         </div>
       )}
