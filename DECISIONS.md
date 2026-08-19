@@ -127,6 +127,21 @@
   + 引擎注入 `obs`,同汇一把**有限环形上限(2000)**的 sink(防长跑无界增长);**默认不注入则零发射、行为逐字节不变**
   (150+ 存量测试不受影响,`obs/engine-trace.test.ts` 专测"不传 obs → sink 恒空"的向后兼容)。见 `obs/engine-trace.test.ts` /
   `obs/tracer.test.ts` / `obs/recovery.test.ts` / `schema.test.ts`。
+- ④ 出问题后怎么"复现"一局又不重跑模型、不泄密、还能验出被人动过手脚(change 04-G 回放层):
+  做成**事件式回放**(design.md 决策 8):引擎的 `game.events` 里**只有已接受的公开动作**(被拒候选只在 04-F trace 留 hash/length,
+  从不进事件流),所以回放天然只复放"能公开复放的东西"。`replay/log.ts` 把有序事件折成日志,每条带**位置序号 `seq`**(0,1,2,…)作
+  单调 ID + **FNV-1a 链式校验和**(`checksum[i]=hash(checksum[i-1]#canonical[i])`);关键是**丢弃引擎内部的 `randomUUID` 事件 id 与时钟**,
+  只留语义字段——故同一局内容 → **逐字节相同的日志**(`replay.test.ts` 断言同 seed 两局 `records` 全等),与 04-E 可复现口径一脉。
+  回放校验四关(`replay/replay.ts` 的 `validateReplayLog`):① schema/version(过登记的 `event` strict schema + 版本信封 = 迁移守卫)
+  ② 缺口 / 乱序(`seq≠位置`)③ 重复(`seq` 已见)④ 篡改(链式校验和失配,含截断 / 追加)——每种都**定位到具体 `seq`**。重建函数
+  `reconstructTimeline(log)` **签名里根本没有模型参数**,故"不重跑模型"不是靠自觉而是**结构上不可能**;`replay.test.ts` 用 `CountingModel`
+  额外证"反复重建期间模型调用数恒为 0",并证重建出的描述与本局公开描述**逐条一致**(accepted 可复放,补齐 §3.3 的 accepted 侧)。
+  数据记录导出 `replay/dataset.ts` 走登记的 `datasetRecord` strict 信封,三条隐私纪律:**假名化**(真实姓名 / 席位 id 全丢,只留座次
+  派生 `p0..p4`)、**无密词位**(schema 结构上没有 word 字段 → 密词永不落盘)、**来源三分离**(`human`/`transfer`/`synthetic` 显式传入、
+  不自动混写)。放弃了两条歧路:一是**存完整状态快照 + 重跑模型来"回放"**——那既不确定(墙钟 / 采样)、又要把私有身份 / 密词一并存盘,
+  正是隐私雷区;二是**把随机 `randomUUID` 事件 id 也写进日志**——那样同一局两次导出就不逐字节相等,回放的"可核对"意义就没了。生产接线:
+  引擎 `getReplayLog`/`reconstructReplay`(只读派生,不改核心)+ `GET /api/games/:id/replay`(公开安全端点,`app.test.ts` 证不含 role/word、
+  扫不出密词);`exportDataset` 含终局 role 标签,**服务端专用、不设 HTTP 出口**,避免终局前泄身份。见 `replay/replay.test.ts`(20 条)/ `app.test.ts`。
 
 ## 4. 验证证据
 
@@ -152,6 +167,11 @@
   权威状态逐字节 before == after**(CH-4 优雅降级)。生产接线后同一把 sink 在真实 `createApp` 里跑,非测试脚手架。
   测试计:`npm run test:node` → **157 通过 / 0 跳过**(27 文件,含 `obs/*` 51 条);`npm run build`(`tsc --noEmit`)通过;
   `npm run contract:node` → **28 通过 / 0 失败**;`npx openspec validate 04-evaluation-and-recovery --strict` → valid。
+- 事件式回放 + 数据记录(change 04-G 回放层):`replay/replay.test.ts`(20 条)证四关各自触发并**定位到具体 `seq`**
+  (缺口 / 重复 / 篡改含截断 / 非法 type / 版本不符)、同 seed 两局 `records` **逐字节相等**、反复重建期间**模型调用数恒 0**、
+  重建描述与本局公开描述**逐条一致**、日志与 `datasetRecord` 导出**扫不出任何密词**、导出物假名化(`p0..p4`)且结构无 `word` 键;
+  `app.test.ts` 证 `GET /api/games/:id/replay` 只读端点**不含 role/word、扫不出密词、未知局 404**。测试计随 04-G 升至
+  **`npm run test:node` 178 通过 / 0 跳过**(28 文件);`build`(`tsc --noEmit`)/ `contract:node` 28-0 / `openspec validate 04 --strict` 全绿。
 - 用真实模型完整跑一局的记录:`docs/evidence/03-6-real-game.md`(脚本 `server/tools/play-real-game.ts`,
   真机 3 轮到终局,23/80 次调用)。看点:四人设话风可辨、后发接住先发、平票触发第 2 张选票、
   秘密词全程脱敏为 ▢▢;本局卧底(出其不意人设 小满)以诗意误导取胜。

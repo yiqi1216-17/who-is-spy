@@ -7,7 +7,10 @@ import { type HookFn, HookRegistry } from './hooks.js';
 import { emptyBelief, observeRound } from './beliefs.js';
 import { safeDigest } from './redaction.js';
 import { type TraceSink, emitTrace, traceHookResults } from './obs/tracer.js';
-import type { Belief, TraceEvent } from './schema.js';
+import { type ReplayLog, buildReplayLog } from './replay/log.js';
+import { type ReconstructedTimeline, reconstructTimeline } from './replay/replay.js';
+import { toDatasetRecord } from './replay/dataset.js';
+import type { Belief, TraceEvent, Versioned } from './schema.js';
 import type {
   Description,
   GameReview,
@@ -258,6 +261,35 @@ export class GameEngine {
 
   getInternalGame(id: string): GameState {
     return this.requireGame(id);
+  }
+
+  /**
+   * 回放日志(OpenSpec 04 · §5.1):把有序公开事件折成带单调 ID + 链式校验和的日志。
+   * 只读、纯函数派生 —— 引擎内部 randomUUID 事件 id 被丢弃,故日志逐字节稳定、可离线校验。
+   */
+  getReplayLog(id: string): ReplayLog {
+    const game = this.requireGame(id);
+    return buildReplayLog(game.id, game.events);
+  }
+
+  /**
+   * 重建公开决策时间线(§5.1 / §3.3 accepted 侧):先过完整性四关,再从事件折出时间线。
+   * **不重跑模型**(重建函数无模型参数)——被拒私有候选不在事件里,天然只复放已接受的公开动作。
+   */
+  reconstructReplay(id: string): ReconstructedTimeline {
+    return reconstructTimeline(this.getReplayLog(id));
+  }
+
+  /**
+   * 数据记录导出(§5 数据记录侧):投影成假名化、无密词、来源分离的 `datasetRecord`。
+   * **服务端专用**(含 role 终局标签)——不经 HTTP 下发,避免终局前泄身份。
+   */
+  exportDataset(
+    id: string,
+    provenance: 'human' | 'transfer' | 'synthetic',
+    license?: string,
+  ): Versioned<'datasetRecord'> {
+    return toDatasetRecord(this.requireGame(id), provenance, license);
   }
 
   async submitHumanDescription(id: string, text: string): Promise<PublicGameState> {

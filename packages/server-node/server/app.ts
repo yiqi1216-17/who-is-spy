@@ -45,6 +45,16 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
     }
   });
 
+  // 只读回放(OpenSpec 04 · §5.1):从有序公开事件重建时间线,经完整性四关校验。
+  // 只吐公开动作(描述/票型/出局/高光锚点),不含 role/word;dataset 导出含终局标签,故不设 HTTP 出口。
+  app.get('/api/games/:id/replay', (request, response, next) => {
+    try {
+      response.json(engine.reconstructReplay(request.params.id));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post('/api/games/:id/describe', async (request, response, next) => {
     try {
       const input = descriptionInput.parse(request.body);

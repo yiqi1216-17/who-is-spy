@@ -7,10 +7,10 @@
 > (`server/eval/*` + `tools/evaluate.ts` + 23 条测试;命令 `npm run eval:node`)。
 > 治理化子项按「以效果为目标、不引入数据治理开销」**显式延后**(与 03 一脉相承:运行系统只用
 > `synthetic` 种子、不接触人类语料,故无 split/frozen-core/consent 之实):1.1 多版本清单校验、
-> 2.1 frozen-core 哈希门、2.4 盲测人类偏好采样。§3/§4(可观测 trace + 故障分类/恢复)→ **04-F**,
-> §5(replay + 数据记录)→ **04-G**,§6(证据系统收尾)→ **交付收尾批**。下方逐条保留原文并标注去向。
-> 计:**评测轨交付 4 项全绿**(1.2/1.3/2.2/2.3);**04-F 可观测/恢复轨再交付 6 项全绿**(3.1/3.2/4.1/4.2/4.3/4.4)、
-> 3.3 被拒候选侧已证(accepted 复放随 04-G);3 项治理轨显式延后;余下(3.3 复放侧 + §5 replay/数据记录 + §6 证据收尾)归 04-G/收尾。
+> 2.1 frozen-core 哈希门、2.4 盲测人类偏好采样。§3/§4(可观测 trace + 故障分类/恢复)→ **04-F 已交付**,
+> §5.1(事件式回放 + 数据记录)→ **04-G 已交付**,§5.2/5.3(治理/晋级)+ §6(证据系统收尾)→ **交付收尾批**。下方逐条保留原文并标注去向。
+> 计:**评测轨交付 4 项全绿**(1.2/1.3/2.2/2.3);**04-F 可观测/恢复轨 6 项全绿**(3.1/3.2/4.1/4.2/4.3/4.4);
+> **04-G 回放轨 2 项全绿**(3.3 两侧补齐 + 5.1 事件式回放/数据记录);5 项治理/晋级轨显式延后;余下(§6 证据收尾)归交付收尾批。
 
 ## 1. Establish reproducible evaluation inputs
 
@@ -32,7 +32,7 @@
 
 - [x] 3.1 Write success/failure artifact scans with unique key, word, prompt, belief, and hidden-vote sentinels, then emit allowlisted trace events. — `redaction.ts` 单一哨兵尺(全部密词 + 凭据前缀 `sk-`/`ark-`);`obs/tracer.ts` `scanTraceArtifacts` + `traceEvent` **strict schema 结构性**拒 word/prompt/belief/hidden-vote(只留登记键)+ `policyCode` **允许列**闸自由文本。证:`obs/engine-trace.test.ts`(候选=密词本身时工件仍扫不出机密)、`obs/tracer.test.ts`(允许列拒自由文本、strict 拒 `reasoning`)、`schema.test.ts`(traceEvent 拒 word/prompt/belief/apiKey)。
 - [x] 3.2 Add correlation, attempt, error, latency, usage, policy, version, and commit-state assertions for every model and hook boundary. — trace 字段:correlationId / attempt / outcome(含 `error`)/ latencyMs(墙钟,仅真机注入 `now` 时出现,保 fixture 逐字节稳定)/ policyCode / 版本(`{v,kind}` 信封)/ commit-state(CH-4 前后相等)。边界全覆盖:describe(引擎决策纠偏 + `TracedModel` 传输)、vote / review(`TracedModel` 传输)、hook(`traceHookResults`)。**usage(token)按 design §5 不进逐条 trace**,在指标层(04-E `eval/metrics.ts`)带分母聚合,避免把不稳定量塞进稳定 trace。证:`obs/recovery.test.ts`(三模型边界 + latency + CH-4)、`obs/engine-trace.test.ts`(hook + describe accepted/rejected)、`obs/tracer.test.ts`(版本往返)。
-- [ ] 3.3 Prove accepted public actions are replayable while rejected private candidates retain only safe hash, length, code, and timing metadata. — **被拒私有候选侧已证**:只留 `candidateHash`(FNV-1a→8-hex,不可逆)+ `candidateLength`(码点数)+ `policyCode`(code)+ `latencyMs`(timing),原文即弃;`obs/engine-trace.test.ts` 证「候选=密词本身」时 `scanTraceArtifacts` 仍为空、`schema.test.ts`/`engine-trace` 证非 8-hex 的 hash 被 strict 拒。**accepted 公开动作的事件复放重建(不重跑模型)**属 design §8 → 随 **04-G §5.1** 落地后合并勾选。
+- [x] 3.3 Prove accepted public actions are replayable while rejected private candidates retain only safe hash, length, code, and timing metadata. — **两侧俱证(04-F 被拒侧 + 04-G accepted 侧)**。被拒私有候选侧(04-F):只留 `candidateHash`(FNV-1a→8-hex,不可逆)+ `candidateLength`(码点数)+ `policyCode`(code)+ `latencyMs`(timing),原文即弃;`obs/engine-trace.test.ts` 证「候选=密词本身」时 `scanTraceArtifacts` 仍为空。accepted 公开动作侧(04-G · §5.1):`replay/*` 从有序事件重建描述/票型/出局/高光锚点,`replay.test.ts` 证「重建期间模型调用数恒为 0」「重建描述与本局公开描述逐条一致」「日志扫不出密词」;被拒候选**从不进事件流**,故日志天然只含可复放的公开动作 —— 两者结构互补:accepted 全文可复放、rejected 仅留指纹。
 
 ## 4. Classify and recover failures
 
@@ -45,9 +45,14 @@
 
 ## 5. Replay and evolve safely
 
-- [ ] 5.1 Add schema/version, monotonic-ID, gap, duplication, and tamper tests, then reconstruct the public decision timeline without rerunning models.
-- [ ] 5.2 Add quarantined, de-identified, rights-checked failure intake and prove it can update only a future rolling challenge manifest, never frozen core.
-- [ ] 5.3 Implement champion/challenger promotion and rollback manifests with hard gates, declared target gain, regression budgets, uncertainty, cost/latency limits, and retained previous champion.
+> **04-G 已交付(2026-08-19)**:5.1 全绿(`replay/{log,replay,dataset}.ts` + `replay/replay.test.ts` 20 条 + `app.ts` 只读回放端点)。
+> 事件式回放接线上运行系统:引擎 `getReplayLog`/`reconstructReplay`(只读派生,不改核心)+ `GET /api/games/:id/replay`(公开安全,不含 role/word)。
+> 数据记录导出 `exportDataset` 假名化(p0..p4)、无密词位、来源三分离,**服务端专用**(含终局 role 标签,不经 HTTP)。
+> 5.2/5.3 属**基准治理/晋级策略**(quarantine intake + champion/challenger),按「以效果为目标、不引入数据治理开销」**显式延后→交付收尾/06**。
+
+- [x] 5.1 Add schema/version, monotonic-ID, gap, duplication, and tamper tests, then reconstruct the public decision timeline without rerunning models. — `replay/log.ts` 位置序号(单调 ID)+ FNV-1a 链式校验和(丢弃引擎 randomUUID → 逐字节稳定);`replay/replay.ts` 完整性四关(schema/version 迁移守卫、缺口、重复、篡改含截断/追加)+ `reconstructTimeline`(**签名无模型** → 结构上不可能重跑)。证:`replay/replay.test.ts`(20 条,含「同 seed 两局 records 逐字节相等」「模型调用恒 0」「重建描述逐条一致」「四关各自触发并定位 seq」)。
+- [ ] 5.2 Add quarantined, de-identified, rights-checked failure intake and prove it can update only a future rolling challenge manifest, never frozen core. — **延后→交付收尾/06**(隔离入库 + 权利校验属数据治理;运行系统只用 synthetic 种子,无 frozen-core/rolling 之实;`exportDataset` 已交付假名化 + 来源分离的效果等价物)
+- [ ] 5.3 Implement champion/challenger promotion and rollback manifests with hard gates, declared target gain, regression budgets, uncertainty, cost/latency limits, and retained previous champion. — **延后→交付收尾/06**(晋级/回滚策略需多版本冠军线;当前单模型,先落评测门禁与回放,晋级面留真机对比批后再谈)
 
 ## 6. Verify the evidence system
 
