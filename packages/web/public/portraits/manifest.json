@@ -1,0 +1,38 @@
+{
+  "generatedWith": "doubao-seedream-5-0-pro-260628",
+  "provider": "Volcengine Ark (doubao-seedream)",
+  "rights": "本项目生成的原创美术资产,服务端离线生成,用于前端展示;不含第三方受版权游戏美术。",
+  "styleDirection": "modern minimal ink-wash character portrait, warm cream paper texture, subtle risograph grain, flat shapes with fine confident linework, limited earthy palette, centered head-and-shoulders bust, soft studio spotlight, calm negative space background, tasteful editorial illustration, no text, no letters, no watermark, no logo, high-end poster art",
+  "portraits": [
+    {
+      "id": "ai-1",
+      "status": "failed",
+      "error": "HTTP 404: {\"error\":{\"code\":\"ModelNotOpen\",\"message\":\"Your account 2130537121 has not activated the model doubao-seedream-5-0-pro-260628. Please activate the model service in the Ark Console. Request id: 0217870"
+    },
+    {
+      "id": "ai-2",
+      "status": "failed",
+      "error": "HTTP 404: {\"error\":{\"code\":\"ModelNotOpen\",\"message\":\"Your account 2130537121 has not activated the model doubao-seedream-5-0-pro-260628. Please activate the model service in the Ark Console. Request id: 0217870"
+    },
+    {
+      "id": "ai-3",
+      "status": "failed",
+      "error": "HTTP 404: {\"error\":{\"code\":\"ModelNotOpen\",\"message\":\"Your account 2130537121 has not activated the model doubao-seedream-5-0-pro-260628. Please activate the model service in the Ark Console. Request id: 0217870"
+    },
+    {
+      "id": "ai-4",
+      "status": "failed",
+      "error": "HTTP 404: {\"error\":{\"code\":\"ModelNotOpen\",\"message\":\"Your account 2130537121 has not activated the model doubao-seedream-5-0-pro-260628. Please activate the model service in the Ark Console. Request id: 0217870"
+    },
+    {
+      "id": "human",
+      "status": "failed",
+      "error": "HTTP 404: {\"error\":{\"code\":\"ModelNotOpen\",\"message\":\"Your account 2130537121 has not activated the model doubao-seedream-5-0-pro-260628. Please activate the model service in the Ark Console. Request id: 0217870"
+    },
+    {
+      "id": "stage",
+      "status": "failed",
+      "error": "HTTP 404: {\"error\":{\"code\":\"ModelNotOpen\",\"message\":\"Your account 2130537121 has not activated the model doubao-seedream-5-0-pro-260628. Please activate the model service in the Ark Console. Request id: 0217870"
+    }
+  ]
+}
