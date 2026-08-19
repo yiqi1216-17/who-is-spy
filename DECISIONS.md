@@ -13,14 +13,26 @@
 
 ## 1. 我完成了哪些任务线
 
-- [ ] 任务线① Agent 决策与编排(让四个 AI 有各自策略、会利用逐步公开的信息、说话不泄题)—— 必做
-- [ ] 任务线② 效果评测(用一个命令批量跑多局,输出可对比的质量指标)
-- [ ] 任务线③ 可观测性与故障恢复(出问题时能看清、能复现、能优雅降级)
-- [ ] 选做加分:前端体验优化 / 后端工程优化(见任务书第 3 节)
+- [x] 任务线① Agent 决策与编排(让四个 AI 有各自策略、会利用逐步公开的信息、说话不泄题)—— 必做
+  - 三病全反转(CH-1 顺序 / CH-2 人设 / CH-3 质量),CH-4 原子性作为不变量保持。证据见 §3 与 `docs/evidence/03-6-proof.md`。
+- [x] 任务线② 效果评测(用一个命令批量跑多局,输出可对比的质量指标)
+  - `npm run eval:node -- --games N --seed S`:确定性自博弈,输出带分母+置信半宽的全套指标,五类门任一命中非零退出。
+    证据见 §4 与 `docs/evidence/04-E-eval-scorecard.md`。
+- [x] 任务线③ 可观测性与故障恢复(出问题时能看清、能复现、能优雅降级)
+  - 脱敏 trace(九类故障分类学 + 决策纠偏 + hook 世系,同汇一把环形 sink)+ 事件式回放(四关校验、不重跑模型)+
+    dev-only 故障注入开关,并落到同端口 `/ops.html` 观测台(生产四重闸禁用)。证据见 §3 ③④⑤、§4。
+- [x] 选做加分:前端体验优化 / 后端工程优化(见任务书第 3 节)
+  - 前端:竖屏 9:16 剧场(五席立绘 + 首人称完整对局 + 上帝/玩家双模式 + 高光 + 反馈手记),生产禁用的开发态场景驱动。
+  - 后端:版本化 schema 底座 + 域状态机 + 每局命令链/原子提交 + typed hook 注册表 + 私有结构化信念。
 
 > 任务线④是现场当场揭晓的题目,带回家不用准备,这里也不用写。
 
-未完成的部分及原因:
+未完成的部分及原因(诚实标注):
+- **真实人类语料挖掘 + 数据合规机器**(03 §3/§4 的 consent/rights/split-manifest/lineage)未做——运行系统只用 `synthetic`
+  种子策略,不接触人类语料,故没有未兑现的隐私承诺;已交付效果等价物(策略×代码解耦,替换为语料分布是纯数据变更)。
+- **竖屏像素级截图/录屏矩阵**(05 §4.4)未做——本机无浏览器驱动(playwright 缓存空、联网超时);可自动化的安全区/输入可达性/
+  动效/重连连续性已用确定性断言(`viewport.test.ts` 17 例)全绿,像素证据留现场真机演示时补。
+- **05 第 6.3 真人盲测**(clarity/fun/replay/share 意图)未做——需真人样本,留现场 playtest;其余 6.x 门禁类已全绿。
 
 ## 2. Coding Agent 使用记录
 
@@ -143,7 +155,22 @@
   引擎 `getReplayLog`/`reconstructReplay`(只读派生,不改核心)+ `GET /api/games/:id/replay`(公开安全端点,`app.test.ts` 证不含 role/word、
   扫不出密词);`exportDataset` 含终局 role 标签,**服务端专用、不设 HTTP 出口**,避免终局前泄身份。见 `replay/replay.test.ts`(20 条)/ `app.test.ts`。
 
-- ⑤ 评测面板 / trace 视图 / 故障注入开关放在哪(任务线③的前端呈现,题面第 3 节点名的加分项):
+- ⑥ 投票理由 `vote.reason` 的公开/私有边界(一处**保持基线并如实标注残余风险**的取舍):
+  一条投票(`Vote`)= `voterId` / `targetId` / `reason` / `round` / `ballot`,经 `toPublic` **无条件全量公开**
+  (`game-engine.ts::toPublic` 的 `votes: game.votes`,终局前即可见)。**公开本身是基线契约行为**,也是推理体验的
+  地基——投票可视化、终局票局回放、评测的票因分析都消费它;把它私密化会砍掉"公开票型可复盘"这条产品线。
+  **但要如实标注一处不对称**:描述侧有**双重结构闸**(`model.ts` 适配器对含密词描述直接抛错重试 + 引擎
+  `evaluateDescription` 质量门四判定、有界重试、穷尽即原子终止),而 `reason` 只有 prompt 语义约束
+  ("给出简短**公开**理由",`model.ts::vote`)+ zod 长度闸(2–80 字),**没有**字面/伪装泄题判定——模型生成
+  reason 时上下文里确有自己的 role/word,理论上存在"把密词藏进投票理由"的**残余泄题面**。为什么本轮**不**给它
+  套质量门:① 语义方向不同——reason 陈述"为什么怀疑**别人**",正常输出不触及自己的词,风险是低频尾部而非
+  描述那种"每句都在词的引力场里";② 契约与行为保守——reason 公开是冻结契约的一部分,加拦截改变既有行为面,
+  收益/风险比不如描述门;③ 已有下游监控——评测线的泄题指标扫的是**全部公开文本**(含 reason),真机批量跑若
+  出现 reason 泄题会被记分卡暴露,不至于无声。**若现场要求收紧**:正确落点是把 `evaluateDescription` 的
+  exact/obfuscated 两类判定(不含同质判定,同质对 reason 无意义)在 `generateVotes` 采纳 `result.reason` 前
+  复用一遍——纯函数已就位,接线是十行级改动;这也是我对"下一步最想修什么"的答案之一。
+  另:真正的私有推理通道是 `private_reasoning_summary`(≤120 字,`schema.ts`),它不进 `toPublic`、不进他人
+  上下文、不进事件流——"动机"有独立私有链路,不需要靠藏 `vote.reason` 来承担。
   **同端口独立入口 `http://localhost:5173/ops.html`(横屏控制台),而不是新起一个端口、也不融进游戏页**。
   三选一的取舍:新端口要多一份 vite 配置 + 代理 + 一个现场可能挂的进程,收益为零;融进游戏页会把开发工具
   混进玩家动线、还得在竖屏牌桌里塞横屏表格。独立 `.html` 入口两头占优:dev 下 vite 按文件系统直接服务、
@@ -202,3 +229,11 @@
   web `tsc` EXIT 0 + `vite build` 后 **dist 无观测台工件**(仅 index 单 chunk,内容 grep EXIT=1)。
   dev 冒烟:`GET /api/ops/faults` → `{"armed":false,...}`、`POST /api/ops/eval`(2 局)在线返回记分卡、
   `http://localhost:5173/ops.html` 200。
+- 前端体验线(change 05-H,竖屏剧场)收口计:web `npx vitest run` → **8 文件 89 通过 / 0 跳过**
+  (表现层状态机 13 · 导演编排 12 · 上帝导演 11 · SSE 流 17 · 高光 9 · 反馈 6 · 场景库 13 · 视口契约 17);
+  web `tsc --noEmit` EXIT 0;`vite build` 单 chunk(生产无场景驱动/观测台工件,独占串 grep `leaked=0`)。
+  开发态场景驱动 `?scene=` 十场景(role-reveal/speech/vote/tie/elimination/failure/reconnect/finale/highlight/replay)
+  全部用生产 schema 构造,生产禁用三层保险(结构不 import api / 构建 DCE / 运行时抛错)。
+  证据 `docs/evidence/05-4-scene-driver.md`;`openspec validate 05 --strict` ✓。
+- 全局门禁末次复核(2026-08-19 交付收口):`npm run build` EXIT 0(web + server 双 tsc)·
+  `npm run test:node` **280 通过 / 0 跳过(39 文件)** · `npm run contract:node` **28 通过 / 0 失败**。
