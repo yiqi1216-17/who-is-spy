@@ -24,8 +24,8 @@
 ## 4. Connect authoritative events and CLI scenes
 
 - [x] 4.1 Add versioned SSE consumption with monotonic IDs, deduplication, resume, and authoritative state-refresh fallback while retaining existing HTTP commands.
-- [ ] 4.2 Build the development CLI scene driver for role reveal, speech, vote, tie, elimination, failure, reconnect, finale, highlight, and replay using production schemas.
-- [ ] 4.3 Prove production builds reject or omit CLI/fault controls and that fixture scenes cannot mutate a production game.
+- [x] 4.2 Build the development CLI scene driver for role reveal, speech, vote, tie, elimination, failure, reconnect, finale, highlight, and replay using production schemas. — `scenes/scenes.ts` 用生产类型(`PublicGameState`/`PublicPlayer`/`GameEvent`/`Vote`/`HighlightReel`)构造十份确定性快照,`tsc` 即 schema 校验;`scenes/harness.tsx` 经 `?scene=` 渲染,复用真实 `RevealScreen`(`onDone`)/`FinaleScreen`(`onRestart`),`failure`/`reconnect` 由真实表现层状态机 `run([NET_LOST|NET_RETRYING])` + `overlay()` 派生(网络轴与剧场相位正交,非复刻)。证据 `docs/evidence/05-4-scene-driver.md`。
+- [x] 4.3 Prove production builds reject or omit CLI/fault controls and that fixture scenes cannot mutate a production game. — 三层保险:**结构**(scenes.ts/harness.tsx 从不 import `../api`、无 `api.` 调用,`scenes.test.ts` 读源码断言 → 无写命令可触发)· **构建**(`main.tsx` 以 `import.meta.env.DEV && ?scene` 守卫动态 import;生产 DCE 消除,产物无 `harness-*.js` 分块,12 个 scenes 独占串在 `dist/` 检索 `leaked=0`)· **运行时**(`SceneHarness` 入口 `!import.meta.env.DEV` 即抛错)。假阳性已澄清:`阿序`/`身份揭晓` 等命中来自生产 `characters.ts`/`portraits.tsx`/`FinaleScreen.tsx`,故证明须用独占串。
 - [ ] 4.4 Capture the critical portrait scene matrix as screenshots or video and run mobile viewport E2E checks for safe areas, input reachability, motion, and reconnect continuity.
 
 ## 5. Add view modes and replay value
@@ -34,7 +34,7 @@
 - [x] 5.2 Unlock terminal roles, words, structured belief evolution, and evidence links only after authoritative terminal reveal; never expose free-text chain-of-thought.
 - [x] 5.3 Add fixture-backed detectors for consensus flips, self-saves, undercover blending, lone correct reads, decisive votes, callbacks, and novel safe metaphors.
 - [x] 5.4 Rank a bounded diverse moment reel and add spoiler-safe cards; generated titles must cite event IDs and pass quote/action/outcome faithfulness checks.
-- [ ] 5.5 Add consented, de-identified completion, rematch, favorite Agent, favorite moment, share, replay-intent, and playtest-preference feedback with a complete opt-out path.
+- [x] 5.5 Add consented, de-identified completion, rematch, favorite Agent, favorite moment, share, replay-intent, and playtest-preference feedback with a complete opt-out path.
 
 ## 6. Verify product completeness
 

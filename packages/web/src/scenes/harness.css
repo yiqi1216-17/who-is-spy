@@ -1,0 +1,304 @@
+/* 开发态场景驱动样式(OpenSpec 05-H · 任务 4.2)。仅 DEV 动态加载,生产不打包。 */
+
+.sh-root {
+  min-height: 100vh;
+  background: radial-gradient(120% 80% at 50% 0%, #1c1a26 0%, #12111a 60%, #0d0c14 100%);
+  color: #e8e4da;
+  display: flex;
+  flex-direction: column;
+}
+
+.sh-switch {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  background: rgba(13, 12, 20, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(212, 175, 105, 0.25);
+  flex-wrap: wrap;
+}
+
+.sh-brand {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #d4af69;
+  white-space: nowrap;
+}
+
+.sh-tabs {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.sh-tabs button {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 228, 218, 0.18);
+  background: transparent;
+  color: #cfc8ba;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.sh-tabs button:hover {
+  border-color: rgba(212, 175, 105, 0.55);
+  color: #f0eadd;
+}
+
+.sh-tabs button.on {
+  background: linear-gradient(135deg, #b5643c, #d4874f);
+  border-color: transparent;
+  color: #1a120c;
+  font-weight: 600;
+}
+
+.sh-stage {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 1.25rem 1rem 3rem;
+}
+
+/* 用 9:16 竖屏画框框住场景,直接对齐截图矩阵(任务 4.4)。 */
+.sh-frame {
+  width: min(390px, 100%);
+  min-height: 720px;
+  border-radius: 22px;
+  border: 1px solid rgba(212, 175, 105, 0.22);
+  background: rgba(20, 18, 28, 0.6);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  position: relative;
+}
+
+.sh-inspector {
+  padding: 1.1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.sh-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8rem;
+  color: #b8b0a2;
+  flex-wrap: wrap;
+}
+
+.sh-phase {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(212, 175, 105, 0.14);
+  color: #d4af69;
+}
+
+.sh-phase.voting {
+  background: rgba(181, 100, 60, 0.18);
+  color: #e0a06f;
+}
+
+.sh-overlay {
+  margin-left: auto;
+  font-size: 0.74rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.sh-overlay.failure {
+  background: rgba(180, 60, 60, 0.2);
+  color: #f0968f;
+  border: 1px solid rgba(240, 150, 143, 0.4);
+}
+
+.sh-overlay.reconnect {
+  background: rgba(90, 130, 200, 0.18);
+  color: #9fc0f0;
+  border: 1px solid rgba(159, 192, 240, 0.4);
+}
+
+.sh-seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 0.5rem;
+}
+
+.sh-seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.55rem 0.3rem;
+  border-radius: 12px;
+  background: rgba(232, 228, 218, 0.05);
+  border: 1px solid rgba(232, 228, 218, 0.1);
+  position: relative;
+}
+
+.sh-seat.out {
+  opacity: 0.42;
+  filter: grayscale(0.7);
+}
+
+.sh-av {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.sh-nm {
+  font-size: 0.76rem;
+  color: #d8d2c6;
+}
+
+.sh-tag {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  font-size: 0.6rem;
+  padding: 0.08rem 0.3rem;
+  border-radius: 5px;
+  background: #5a4438;
+  color: #e8d9c8;
+}
+
+.sh-eligible,
+.sh-votes {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.sh-dim {
+  color: #8a8478;
+}
+
+.sh-chip {
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(212, 175, 105, 0.14);
+  color: #e0c78a;
+  font-size: 0.74rem;
+}
+
+.sh-vote {
+  padding: 0.18rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(181, 100, 60, 0.14);
+  color: #e0a06f;
+  font-size: 0.72rem;
+}
+
+.sh-events {
+  list-style: none;
+  margin: 0;
+  padding: 0.6rem 0;
+  border-top: 1px solid rgba(232, 228, 218, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sh-ev {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.sh-evr {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.66rem;
+  color: #8a8478;
+  flex-shrink: 0;
+  padding-top: 0.1rem;
+}
+
+.sh-evt {
+  color: #cfc8ba;
+}
+
+.sh-ev.system .sh-evt {
+  color: #a8a294;
+  font-style: italic;
+}
+
+.sh-ev.vote_result .sh-evt {
+  color: #e0a06f;
+}
+
+.sh-ev.elimination .sh-evt {
+  color: #f0968f;
+}
+
+/* 逐拍回放控制条(replay 场景)。 */
+.sh-beatbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sh-beatbar button {
+  font-size: 0.78rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(212, 175, 105, 0.35);
+  background: rgba(212, 175, 105, 0.1);
+  color: #e0c78a;
+  cursor: pointer;
+}
+
+.sh-beatbar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sh-cursor {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.72rem;
+  color: #8a8478;
+}
+
+/* 高光场景框顶注记:fixture 自带的剧透安全 reel。 */
+.sh-reelnote {
+  padding: 0.5rem 0.9rem;
+  font-size: 0.76rem;
+  color: #e0c78a;
+  background: rgba(212, 175, 105, 0.12);
+  border-bottom: 1px solid rgba(212, 175, 105, 0.2);
+}
+
+.sh-unknown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-align: center;
+  padding: 2rem;
+  color: #b8b0a2;
+}
+
+.sh-unknown code {
+  color: #e0a06f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-tabs button {
+    transition: none;
+  }
+}
