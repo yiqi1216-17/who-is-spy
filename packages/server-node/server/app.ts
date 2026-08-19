@@ -3,6 +3,14 @@ import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { z } from 'zod';
+import {
+  FeedbackError,
+  FeedbackStore,
+  deidentify,
+  feedbackSubmissionSchema,
+  resolveReferences,
+  todayBucket,
+} from './feedback.js';
 import { GameEngine, GameRuleError } from './game-engine.js';
 import { DeepSeekClient, ModelError, type GameModel } from './model.js';
 import { MemoryTraceSink } from './obs/tracer.js';
@@ -30,6 +38,8 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
     sink: traceSink,
     now: () => performance.now(),
   });
+  // 知情、去标识的产品反馈存储(OpenSpec 05-H · 任务 5.5)。进程内、只出聚合、不出逐条。
+  const feedback = new FeedbackStore();
   app.use(express.json({ limit: '16kb' }));
 
   app.get('/api/health', (_request, response) => {
@@ -174,6 +184,31 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
     }
   });
 
+  // —— 知情、去标识的产品反馈(OpenSpec 05-H · 任务 5.5)——
+  // 附加端点、不改冻结契约。知情闸:consent 必须字面量 true(schema 即闸,未同意→400,零落库)。
+  // 去标识:gameId 仅用于把「最爱 Agent/瞬间」校验到真实对局后即弃;落库只留天桶 + 枚举 + 稳定原型。
+  // 完整退出路径在前端(选择「不用了」则一字节都不发送);后端亦拒绝任何未同意提交。
+  app.post('/api/feedback', (request, response, next) => {
+    try {
+      const submission = feedbackSubmissionSchema.parse(request.body);
+      const game = engine.getGame(submission.gameId); // 不存在 → 404
+      const agentIds = game.players.filter((player) => !player.isHuman).map((player) => player.id);
+      const moments = engine
+        .getHighlights(submission.gameId, false)
+        .cards.map((card) => ({ id: card.id, type: card.type }));
+      const resolved = resolveReferences(submission, { agentIds, moments });
+      feedback.record(deidentify(submission, resolved, todayBucket()));
+      response.status(201).json({ recorded: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // 去标识聚合快照(供 playtest 复盘 · 任务 6.3):只出计数,个体记录永不出存储。
+  app.get('/api/feedback/summary', (_request, response) => {
+    response.json(feedback.summary());
+  });
+
   if (process.env.NODE_ENV === 'production') {
     const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
     const distDirectory = path.resolve(currentDirectory, '../../web/dist');
@@ -199,6 +234,10 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
         return;
       }
       if (error instanceof GameRuleError) {
+        response.status(error.status).json({ error: error.message });
+        return;
+      }
+      if (error instanceof FeedbackError) {
         response.status(error.status).json({ error: error.message });
         return;
       }
