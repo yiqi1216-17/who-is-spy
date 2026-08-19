@@ -143,6 +143,25 @@
   引擎 `getReplayLog`/`reconstructReplay`(只读派生,不改核心)+ `GET /api/games/:id/replay`(公开安全端点,`app.test.ts` 证不含 role/word、
   扫不出密词);`exportDataset` 含终局 role 标签,**服务端专用、不设 HTTP 出口**,避免终局前泄身份。见 `replay/replay.test.ts`(20 条)/ `app.test.ts`。
 
+- ⑤ 评测面板 / trace 视图 / 故障注入开关放在哪(任务线③的前端呈现,题面第 3 节点名的加分项):
+  **同端口独立入口 `http://localhost:5173/ops.html`(横屏控制台),而不是新起一个端口、也不融进游戏页**。
+  三选一的取舍:新端口要多一份 vite 配置 + 代理 + 一个现场可能挂的进程,收益为零;融进游戏页会把开发工具
+  混进玩家动线、还得在竖屏牌桌里塞横屏表格。独立 `.html` 入口两头占优:dev 下 vite 按文件系统直接服务、
+  复用同一个 `/api` 代理;**生产构建的入口集里没有它**(rollup 默认只打 `index.html`),故观测台**结构上不进
+  生产 bundle**(实证:`vite build` 后 dist 仅单 chunk,`grep -rl 观测台 dist/` EXIT=1)。生产禁用共**四重闸**,
+  每重可独立测试:① 生产服务端不挂 `/api/ops/*`(404);② 生产模型链上根本不装 `FaultSwitch`(TracedModel
+  直包真实模型,无故障面);③ `arm()`/`registerOpsRoutes` 自校 `NODE_ENV` 即抛;④ 前端入口不在构建集 +
+  `import.meta.env.DEV` 兜底。**trace 的「哪一局」维度**顺手补齐:题面验收要"哪一局/哪一轮/哪个 AI/第几次
+  重试/什么错误"五维,原 traceEvent 缺 gameId——但 `AgentContext.game` 是允许列投影**刻意不含局号**、
+  `GameModel` 接口受契约冻结不能加参,故用 Node 标准 `AsyncLocalStorage`:引擎在 `withGame` 命令体与上帝局
+  解算点 `run({gameId})`,`emitTrace` **单一收口点**读取注入(跨 await 自动继承),三类发射方(传输/纠偏/hook)
+  一处补齐,接口与投影零改动。放弃的歧路:把 gameId 塞进 AgentContext(污染允许列投影,模型 prompt 无端多见
+  一个字段)或改模型签名(破坏冻结契约)。运行时故障开关 `FaultSwitch` 与测试用 `FaultInjectingModel` 语义
+  对齐(复用 `syntheticError` 保证 `classifyFailure` 往返)但**可运行时装/卸**,且禁用态逐字节透传(contract
+  28/0 持续全绿为证);`/api/ops/trace` 输出前再过一遍 `scanTraceArtifacts` 隐私哨兵,命中即拒绝输出——
+  结构性脱敏(strict schema)+ 运行期自证双保险。评测端点在**独立引擎**上跑确定性自博弈(同 seed 逐字节
+  可复现),结构上不触碰线上任何真实对局。
+
 ## 4. 验证证据
 
 > 贴命令 + 关键输出(注意别带上密钥或完整密词)。
@@ -175,3 +194,11 @@
 - 用真实模型完整跑一局的记录:`docs/evidence/03-6-real-game.md`(脚本 `server/tools/play-real-game.ts`,
   真机 3 轮到终局,23/80 次调用)。看点:四人设话风可辨、后发接住先发、平票触发第 2 张选票、
   秘密词全程脱敏为 ▢▢;本局卧底(出其不意人设 小满)以诗意误导取胜。
+- 观测台(任务线③前端呈现,`/ops.html`):`ops.test.ts` 6 例——trace 按 gameId 过滤且五维齐、
+  瞬时 upstream(times=1)重试世系 `[1,'error']→[2,'accepted']` 且对局照常完成、恒失败 auth_config
+  **HTTP 侧整回合原子回滚**(describe 500 后 `GET /api/games/:id` 与失败前逐字节一致,解除后同局恢复推进)、
+  评测端点同 seed 报告逐字节相等 + `demoFail` 门禁红、生产三重闸(路由 404 / 链上 faultSwitch 为 null /
+  `arm` 即抛)。测试计升至 `npm run test:node` **280 通过 / 0 跳过**;`contract:node` **28/0** 持续全绿;
+  web `tsc` EXIT 0 + `vite build` 后 **dist 无观测台工件**(仅 index 单 chunk,内容 grep EXIT=1)。
+  dev 冒烟:`GET /api/ops/faults` → `{"armed":false,...}`、`POST /api/ops/eval`(2 局)在线返回记分卡、
+  `http://localhost:5173/ops.html` 200。
