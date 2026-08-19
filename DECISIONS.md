@@ -105,7 +105,28 @@
   (完成率下限 =1;可区分率下限 =0.5;多样度下限 =0.05;校准命中默认不设硬门——假模型不代表真机),
   五类门(泄题/非法/未完成/隐私哨兵/阈值)任一命中即 **process 非零退出**;`--demo-fail` 注入必然泄题的模型,
   触发质量穷尽→整回合原子终止→完成率门捕获(exit 1),现场演示"门禁真的会红"。keyset 冻结以防指标操纵(R3)。
-- ③ 一条日志 / trace 里记了哪些字段,怎么保证不把密词和 Key 写进去:(change 04-F 可观测层)
+- ③ 一条日志 / trace 里记了哪些字段,怎么保证不把密词和 Key 写进去(change 04-F 可观测层):
+  一条 trace 是一个**版本化 `traceEvent` 信封**(`{v,kind,data}`),`data` 的 schema 是 `.strict()` 的,字段**闭集**共 11 个:
+  `correlationId`(关联一次调用的尝试世系)、`round`/`ballot?`(定位到第几轮 / 第几张选票)、`boundary`
+  (`model.describe`/`model.vote`/`model.review`/`hook` 之一)、`playerId?`(定位到哪个 AI)、`attempt`(第几次尝试)、
+  `outcome`(`accepted`/`rejected`/`error`)、`policyCode?`、`latencyMs?`,以及被拒候选侧的 `candidateHash?`/`candidateLength?`。
+  **不写密词 / Key 靠三道结构性闸,而非事后 grep 兜底**:① strict schema **没有任何自由文本位**——想塞 `reasoning`/`word`/`prompt`/
+  `belief` 这类字段,`parseVersioned` 直接抛(`schema.test.ts` 用 `['word','prompt','belief','apiKey']` 钉死拒绝);
+  ② 唯一的字符串位 `policyCode` 再过**允许列**(`obs/tracer.ts` 的 `POLICY_CODES`:9 类故障 + 5 类质量码 + 2 类 hook + 恢复标记),
+  非登记短码即抛——杜绝把自由文本(乃至密词)伪装成"错误信息"塞进来;③ 被拒候选**绝不落原文**,只留
+  `candidateHash`(FNV-1a → 8 位十六进制,不可逆)+ `candidateLength`(码点数),供"重试是否真换了候选 / 长度是否异常"复盘。
+  **杀手级证明**:`obs/engine-trace.test.ts` 让模型每次都吐**密词本身**当描述,3 次被拒后 `scanTraceArtifacts` 扫全部 trace 序列化
+  **仍为空**——候选就是密词,trace 里却一个密词字面量都扫不出。Key 侧同尺:`redaction.ts` 单一哨兵集含全部密词 + 凭据前缀
+  `sk-`/`ark-`,是质量门 / 评测门 / trace 扫描**共用的一把尺**(单一事实源,不会各扫各的漏)。
+  **两条世系、同汇可辨**(design.md 决策 6):传输重试(`TracedModel` 包模型,`corr-N`,每次 `model.*` 调用一条尝试世系,
+  失败经 `classifyFailure` 归 9 类)与决策纠偏(引擎质量环在 `describe` 边界重描,`eng-N`,拒稿落 `policyCode`+指纹)是
+  **两套独立 correlationId**,却写入**同一个 `MemoryTraceSink`**——所以复盘时既能分辨"是网络重试还是质量重描",又能在一条时间线里连读。
+  放弃了两条歧路:一是**把 usage(token)塞进逐条 trace**——token 是不稳定量,会破坏 fixture 逐字节稳定性,故按 design §5
+  留在**指标层**(04-E `eval/metrics.ts`)带分母聚合;二是**先记原文再运行时脱敏**——脱敏一旦漏一条就是永久泄露,改为
+  **结构上就装不下原文**(strict schema + 指纹替换),从根上取消了"忘了脱敏"的可能。生产接线见 `app.ts`:`TracedModel` 包模型
+  + 引擎注入 `obs`,同汇一把**有限环形上限(2000)**的 sink(防长跑无界增长);**默认不注入则零发射、行为逐字节不变**
+  (150+ 存量测试不受影响,`obs/engine-trace.test.ts` 专测"不传 obs → sink 恒空"的向后兼容)。见 `obs/engine-trace.test.ts` /
+  `obs/tracer.test.ts` / `obs/recovery.test.ts` / `schema.test.ts`。
 
 ## 4. 验证证据
 
@@ -122,7 +143,15 @@
   泄题 0/111 · 非法票 0/111 · 完成率 100% · 多样度 99.6% · 策略可区分率 100% · 自我重复 0.5% ·
   校准命中 35.9%±15.1% · 卧底/平民胜率 50%/50% · 模型调用 234。门禁演示:`-- --demo-fail` → **exit 1**
   (incomplete_game + 阈值门触发)。逐字节稳定性由 `gates.test.ts` 断言。详见 `docs/evidence/04-E-eval-scorecard.md`。
-- 故障注入 + 定位到具体一局 / 某一轮 / 某个 AI / 第几次尝试的示例:(change 04 可观测层)
+- 故障注入 + 定位到具体一局 / 某一轮 / 某个 AI / 第几次尝试的示例(change 04-F 可观测层):
+  `obs/recovery.test.ts` 用 `FaultInjectingModel` 把**9 类故障各自**注入 `model.describe` 边界(`it.each`),断言 trace 末条
+  `policyCode` 落对应短码(503→`upstream` / 429→`rate_limit` / 未配置→`auth_config` …)、`outcome`、及尝试世系长度
+  (可重试打满 `maxAttempts`、不可重试零等待快速失败);时钟经 `recordingClock` 注入 → **断言退避序列却绝不真的等待**。
+  决策纠偏侧 `obs/engine-trace.test.ts`:模型恒吐密词 → 同一 `correlationId` 贯穿 `attempt:[1,2,3]` 三次纠偏、`policyCode='exact_leak'`
+  ——即一条 trace 能定位到"哪一轮 / 哪个 AI(`playerId`)/ 第几次尝试 / 因何被拒",且**终局失败经引擎 `withGame` 原子草稿 →
+  权威状态逐字节 before == after**(CH-4 优雅降级)。生产接线后同一把 sink 在真实 `createApp` 里跑,非测试脚手架。
+  测试计:`npm run test:node` → **157 通过 / 0 跳过**(27 文件,含 `obs/*` 51 条);`npm run build`(`tsc --noEmit`)通过;
+  `npm run contract:node` → **28 通过 / 0 失败**;`npx openspec validate 04-evaluation-and-recovery --strict` → valid。
 - 用真实模型完整跑一局的记录:`docs/evidence/03-6-real-game.md`(脚本 `server/tools/play-real-game.ts`,
   真机 3 轮到终局,23/80 次调用)。看点:四人设话风可辨、后发接住先发、平票触发第 2 张选票、
   秘密词全程脱敏为 ▢▢;本局卧底(出其不意人设 小满)以诗意误导取胜。

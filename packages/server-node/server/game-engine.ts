@@ -5,7 +5,9 @@ import { type GameAction, canAct, canTransition } from './state-machine.js';
 import { type QualityCode, evaluateDescription } from './quality-policy.js';
 import { type HookFn, HookRegistry } from './hooks.js';
 import { emptyBelief, observeRound } from './beliefs.js';
-import type { Belief } from './schema.js';
+import { safeDigest } from './redaction.js';
+import { type TraceSink, emitTrace, traceHookResults } from './obs/tracer.js';
+import type { Belief, TraceEvent } from './schema.js';
 import type {
   Description,
   GameReview,
@@ -48,6 +50,19 @@ export class QualityExhaustedError extends GameRuleError {
 /** 单个 AI 描述的最大生成尝试次数:首次不合规后最多再纠正 (N-1) 次。 */
 export const MAX_DESCRIBE_ATTEMPTS = 3;
 
+/**
+ * 引擎级可观测缝(OpenSpec 04 · §3)。**可选**:不注入则零发射、行为逐字节不变(向后兼容)。
+ * 引擎负责模型装饰器看不到的两处边界——**决策纠偏**(质量拒稿,带 hash/length 指纹)与 **hook**;
+ * 模型传输重试世系由 `TracedModel` 另在同一把 `sink` 上打点,合成统一世系。
+ */
+export interface EngineObservability {
+  sink: TraceSink;
+  /** 注入单调时钟(毫秒);提供则记 latencyMs,不提供则省略(fixture 逐字节稳定)。 */
+  now?: () => number;
+  /** 注入 correlationId 工厂;默认实例内单调计数,确定性、不依赖 randomUUID(呼应 04-G)。 */
+  newCorrelationId?: () => string;
+}
+
 export class GameEngine {
   private readonly games = new Map<string, GameState>();
   /** 每局一条命令链:同一对局的命令串行执行,杜绝并发交错。 */
@@ -61,10 +76,50 @@ export class GameEngine {
    */
   private readonly beliefs = new Map<string, Map<string, Belief>>();
 
+  /** 引擎级 correlationId 单调计数(仅在注入 obs 时启用)。 */
+  private corr = 0;
+
   constructor(
     private readonly model: GameModel,
     private readonly random: () => number = Math.random,
+    private readonly obs?: EngineObservability,
   ) {}
+
+  /** 下一个 correlationId:优先用注入工厂,否则实例内单调 `eng-N`(确定性)。 */
+  private nextCorrelationId(): string {
+    return this.obs?.newCorrelationId?.() ?? `eng-${(this.corr += 1)}`;
+  }
+
+  /**
+   * 在描述边界落一条脱敏 trace(仅在注入 obs 时)。被拒候选只带**不可逆指纹**
+   * (policyCode 短码 + hash + length),**绝不落原文**;成功候选可由公开事件复放,无需在 trace 留文本。
+   */
+  private emitDescribeTrace(
+    correlationId: string,
+    round: number,
+    playerId: string,
+    attempt: number,
+    outcome: TraceEvent['outcome'],
+    started: number | undefined,
+    extra?: { policyCode?: string; candidateHash?: string; candidateLength?: number },
+  ): void {
+    if (!this.obs) return;
+    const fields: TraceEvent = {
+      correlationId,
+      round,
+      boundary: 'model.describe',
+      playerId,
+      attempt,
+      outcome,
+    };
+    if (extra?.policyCode !== undefined) fields.policyCode = extra.policyCode;
+    if (extra?.candidateHash !== undefined) fields.candidateHash = extra.candidateHash;
+    if (extra?.candidateLength !== undefined) fields.candidateLength = extra.candidateLength;
+    if (started !== undefined && this.obs.now) {
+      fields.latencyMs = Math.max(0, this.obs.now() - started);
+    }
+    emitTrace(this.obs.sink, fields);
+  }
 
   /** 注册一个"回合已公开"观察者。返回注销函数。观察者只收公开投影,不能改变对局。 */
   registerRoundHook(name: string, fn: HookFn, opts?: { timeoutMs?: number }): () => void {
@@ -117,7 +172,16 @@ export class GameEngine {
       },
     };
     try {
-      await this.hooks.emit('onRoundPublished', projection);
+      const results = await this.hooks.emit('onRoundPublished', projection);
+      // hook 边界世系:每个观察者的 outcome 映射成脱敏 trace(ok→accepted / timeout|error→error+短码);
+      // hook 名字不入 trace(可能含观察者标识),只记结构化 outcome。
+      if (this.obs) {
+        traceHookResults(this.obs.sink, {
+          correlationId: this.nextCorrelationId(),
+          round: game.round,
+          results,
+        });
+      }
     } catch {
       // 观察者层的任何异常都不回传主流程(投影已在注册表内校验/隔离)。
     }
@@ -341,8 +405,11 @@ export class GameEngine {
       .filter((d) => d.round < contextGame.round && d.playerId === agent.id)
       .map((d) => d.text);
 
+    // 决策纠偏世系:同一 correlationId 贯穿本 Agent 本轮的多次质量尝试(与传输重试世系区分而互补)。
+    const correlationId = this.nextCorrelationId();
     let lastCode: QualityCode = 'too_short';
     for (let attempt = 1; attempt <= MAX_DESCRIBE_ATTEMPTS; attempt += 1) {
+      const started = this.obs?.now?.();
       const text = await this.model.describe(buildAgentContext(contextGame, agent));
       const verdict = evaluateDescription({
         text,
@@ -350,7 +417,18 @@ export class GameEngine {
         priorPublicTexts,
         ownPriorTexts,
       });
-      if (verdict.ok) return text;
+      if (verdict.ok) {
+        // 被接受:公开动作可由事件复放,trace 不留文本(design.md §5)。
+        this.emitDescribeTrace(correlationId, contextGame.round, agent.id, attempt, 'accepted', started);
+        return text;
+      }
+      // 被拒私有候选:只留不可逆指纹 + 质量短码(§3.3),原文即刻丢弃、绝不入 trace。
+      const digest = safeDigest(text);
+      this.emitDescribeTrace(correlationId, contextGame.round, agent.id, attempt, 'rejected', started, {
+        policyCode: verdict.code,
+        candidateHash: digest.hash,
+        candidateLength: digest.length,
+      });
       lastCode = verdict.code;
     }
     throw new QualityExhaustedError(agent.id, lastCode, MAX_DESCRIBE_ATTEMPTS);

@@ -1,5 +1,5 @@
+import { scanSecrets } from '../redaction.js';
 import { type Versioned, envelope } from '../schema.js';
-import { WORD_PAIRS } from '../words.js';
 import { type AggregateResult, type GameMetrics, aggregate, extractGameMetrics } from './metrics.js';
 import type { SelfPlayResult } from './self-play.js';
 
@@ -37,25 +37,15 @@ export interface GateResult {
 }
 
 /**
- * 隐私哨兵词表:报告工件里绝不该出现的机密字面量 = 全部候选**密词** + 凭据标记。
- * 注意**不**含 'undercover'/'civilian' 等角色词——它们是公开词汇,合法出现在指标 key
- * (如 `undercover_win_rate`)里;真正的机密是密词字面量与 API Key,不是角色术语。
- */
-const SENTINELS: readonly string[] = [...new Set(WORD_PAIRS.flat()), 'DEEPSEEK_API_KEY', 'sk-'];
-
-/**
- * 对报告工件做隐私哨兵扫描:序列化后不得出现任何机密字面量。
+ * 对报告工件做隐私哨兵扫描:序列化后不得出现任何机密字面量(密词 + 凭据)。
+ * 哨兵词表由 `../redaction.ts` 单一事实源提供(与可观测 trace 共用同一把尺)。
  * 报告结构上只有数值指标与 suite/milestone 串,故本扫描应恒过——作为**结构安全的证明**而非补丁。
  */
 export function scanReportSentinels(report: Versioned<'report'>): GateFailure[] {
-  const serialized = JSON.stringify(report);
-  const failures: GateFailure[] = [];
-  for (const sentinel of SENTINELS) {
-    if (serialized.includes(sentinel)) {
-      failures.push({ code: 'privacy_sentinel', detail: `报告工件含机密字面量「${sentinel}」` });
-    }
-  }
-  return failures;
+  return scanSecrets(JSON.stringify(report)).map((sentinel) => ({
+    code: 'privacy_sentinel',
+    detail: `报告工件含机密字面量「${sentinel}」`,
+  }));
 }
 
 /** 逐局结果 → 冻结信封报告。 */

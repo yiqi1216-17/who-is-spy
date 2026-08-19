@@ -9,7 +9,8 @@
 > `synthetic` 种子、不接触人类语料,故无 split/frozen-core/consent 之实):1.1 多版本清单校验、
 > 2.1 frozen-core 哈希门、2.4 盲测人类偏好采样。§3/§4(可观测 trace + 故障分类/恢复)→ **04-F**,
 > §5(replay + 数据记录)→ **04-G**,§6(证据系统收尾)→ **交付收尾批**。下方逐条保留原文并标注去向。
-> 计:**本轮交付 4 项全绿**(1.2/1.3/2.2/2.3);3 项治理轨显式延后,余下 13 项归 04-F/04-G/收尾。
+> 计:**评测轨交付 4 项全绿**(1.2/1.3/2.2/2.3);**04-F 可观测/恢复轨再交付 6 项全绿**(3.1/3.2/4.1/4.2/4.3/4.4)、
+> 3.3 被拒候选侧已证(accepted 复放随 04-G);3 项治理轨显式延后;余下(3.3 复放侧 + §5 replay/数据记录 + §6 证据收尾)归 04-G/收尾。
 
 ## 1. Establish reproducible evaluation inputs
 
@@ -26,16 +27,21 @@
 
 ## 3. Add redacted decision observability
 
-- [ ] 3.1 Write success/failure artifact scans with unique key, word, prompt, belief, and hidden-vote sentinels, then emit allowlisted trace events.
-- [ ] 3.2 Add correlation, attempt, error, latency, usage, policy, version, and commit-state assertions for every model and hook boundary.
-- [ ] 3.3 Prove accepted public actions are replayable while rejected private candidates retain only safe hash, length, code, and timing metadata.
+> **04-F 已交付(2026-08-19)**:3.1 / 3.2 全绿;3.3 被拒候选侧已证,accepted 事件复放重建随 04-G §5.1 合并勾选。
+> 可观测层**已接线上运行系统**:`app.ts`/`index.ts` 用 `TracedModel` 包模型(传输世系)+ 引擎注入 `obs`(决策纠偏 + hook 世系),同汇一把脱敏 `MemoryTraceSink`(生产取有限环形上限)。默认不注入则零发射、行为逐字节不变。
+
+- [x] 3.1 Write success/failure artifact scans with unique key, word, prompt, belief, and hidden-vote sentinels, then emit allowlisted trace events. — `redaction.ts` 单一哨兵尺(全部密词 + 凭据前缀 `sk-`/`ark-`);`obs/tracer.ts` `scanTraceArtifacts` + `traceEvent` **strict schema 结构性**拒 word/prompt/belief/hidden-vote(只留登记键)+ `policyCode` **允许列**闸自由文本。证:`obs/engine-trace.test.ts`(候选=密词本身时工件仍扫不出机密)、`obs/tracer.test.ts`(允许列拒自由文本、strict 拒 `reasoning`)、`schema.test.ts`(traceEvent 拒 word/prompt/belief/apiKey)。
+- [x] 3.2 Add correlation, attempt, error, latency, usage, policy, version, and commit-state assertions for every model and hook boundary. — trace 字段:correlationId / attempt / outcome(含 `error`)/ latencyMs(墙钟,仅真机注入 `now` 时出现,保 fixture 逐字节稳定)/ policyCode / 版本(`{v,kind}` 信封)/ commit-state(CH-4 前后相等)。边界全覆盖:describe(引擎决策纠偏 + `TracedModel` 传输)、vote / review(`TracedModel` 传输)、hook(`traceHookResults`)。**usage(token)按 design §5 不进逐条 trace**,在指标层(04-E `eval/metrics.ts`)带分母聚合,避免把不稳定量塞进稳定 trace。证:`obs/recovery.test.ts`(三模型边界 + latency + CH-4)、`obs/engine-trace.test.ts`(hook + describe accepted/rejected)、`obs/tracer.test.ts`(版本往返)。
+- [ ] 3.3 Prove accepted public actions are replayable while rejected private candidates retain only safe hash, length, code, and timing metadata. — **被拒私有候选侧已证**:只留 `candidateHash`(FNV-1a→8-hex,不可逆)+ `candidateLength`(码点数)+ `policyCode`(code)+ `latencyMs`(timing),原文即弃;`obs/engine-trace.test.ts` 证「候选=密词本身」时 `scanTraceArtifacts` 仍为空、`schema.test.ts`/`engine-trace` 证非 8-hex 的 hash 被 strict 拒。**accepted 公开动作的事件复放重建(不重跑模型)**属 design §8 → 随 **04-G §5.1** 落地后合并勾选。
 
 ## 4. Classify and recover failures
 
-- [ ] 4.1 Replace nested retries with one tested taxonomy and attempt lineage covering timeout, rate limit, upstream, malformed JSON, schema, illegal target, policy, auth/configuration, and unknown failures.
-- [ ] 4.2 Test bounded backoff, jitter, `Retry-After`, decision correction, and non-retryable authentication/configuration behavior without real waiting.
-- [ ] 4.3 Add development-only targeted fault injection and prove production rejects fault flags and demo controls.
-- [ ] 4.4 Inject every failure class at each relevant boundary and assert trace classification plus authoritative state before/after equality on terminal failure.
+> **04-F 已交付(2026-08-19)**:4.1–4.4 全绿。传输重试(`obs/retry.ts` 唯一 `withRetry`,注入时钟)与决策纠偏(引擎质量环)是**两条独立世系、同汇可辨**,取代嵌套重试。
+
+- [x] 4.1 Replace nested retries with one tested taxonomy and attempt lineage covering timeout, rate limit, upstream, malformed JSON, schema, illegal target, policy, auth/configuration, and unknown failures. — `obs/failure-taxonomy.ts` 9 类纯函数分类学(往返稳定,含解包 `ModelError.cause` 链与状态码/Retry-After 抽取)+ `obs/retry.ts` 唯一 `withRetry` 尝试世系。证:`obs/taxonomy.test.ts`(9 类往返 + 可重试性 + cause 链 503→upstream/429→rate_limit/未配置→auth_config)、`obs/retry.test.ts`(逐尝试分类可见)。
+- [x] 4.2 Test bounded backoff, jitter, `Retry-After`, decision correction, and non-retryable authentication/configuration behavior without real waiting. — `obs/retry.test.ts`:指数退避 [100,200,400]、抖动上界(满额)/下界(减半)、`Retry-After` 受 `maxDelay` 封顶、auth_config **不可重试零等待**;`recordingClock` 注入 → **绝不真的等待**。决策纠偏:引擎质量环重描(`obs/engine-trace.test.ts` 同 correlationId 贯穿 3 次纠偏世系)。
+- [x] 4.3 Add development-only targeted fault injection and prove production rejects fault flags and demo controls. — `obs/fault-injection.ts` `FaultInjectingModel`(按 boundary / failClass / times 定向注入;每类合成错误往返过 `classifyFailure`;**构造即校 `NODE_ENV`,production 抛错**)。证:`obs/recovery.test.ts` §4.3(生产环境构造抛错,含 try/finally 复原)。
+- [x] 4.4 Inject every failure class at each relevant boundary and assert trace classification plus authoritative state before/after equality on terminal failure. — `obs/recovery.test.ts` §4.4:`it.each` 9 类注入 describe 边界 → 断言 trace 末条 policyCode + outcome + 世系长度(可重试打满 maxAttempts、不可重试快速失败);终局失败(auth_config 恒失败)经引擎 `withGame` 原子草稿 → `structuredClone` 逐字节 **before == after**(CH-4 优雅降级)。vote / review 边界打点另见同文件「三边界各自打点」用例。
 
 ## 5. Replay and evolve safely
 

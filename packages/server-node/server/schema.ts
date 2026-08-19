@@ -217,6 +217,14 @@ const traceEventSchema = z
     outcome: z.enum(['accepted', 'rejected', 'error']),
     policyCode: z.string().optional(),
     latencyMs: z.number().nonnegative().optional(),
+    // 被拒私有候选只留**不可逆**指纹(design.md §5 / §3.3):8 位十六进制短哈希 + 字符长度。
+    // 供「重试确实换了候选 / 长度是否异常」复盘;哈希不可逆、长度信息量不足以重建文本,
+    // 故即便候选夹带密词,指纹里也不出现密词字面量——原文永不入 trace。
+    candidateHash: z
+      .string()
+      .regex(/^[0-9a-f]{8}$/)
+      .optional(),
+    candidateLength: z.number().int().nonnegative().optional(),
   })
   .strict();
 
