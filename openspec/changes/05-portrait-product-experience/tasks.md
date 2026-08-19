@@ -23,7 +23,7 @@
 
 ## 4. Connect authoritative events and CLI scenes
 
-- [ ] 4.1 Add versioned SSE consumption with monotonic IDs, deduplication, resume, and authoritative state-refresh fallback while retaining existing HTTP commands.
+- [x] 4.1 Add versioned SSE consumption with monotonic IDs, deduplication, resume, and authoritative state-refresh fallback while retaining existing HTTP commands.
 - [ ] 4.2 Build the development CLI scene driver for role reveal, speech, vote, tie, elimination, failure, reconnect, finale, highlight, and replay using production schemas.
 - [ ] 4.3 Prove production builds reject or omit CLI/fault controls and that fixture scenes cannot mutate a production game.
 - [ ] 4.4 Capture the critical portrait scene matrix as screenshots or video and run mobile viewport E2E checks for safe areas, input reachability, motion, and reconnect continuity.

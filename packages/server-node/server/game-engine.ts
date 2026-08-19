@@ -26,6 +26,12 @@ import type {
 } from './types.js';
 import { chooseWordPair } from './words.js';
 import { strategyForAgent } from './strategies.js';
+import {
+  GameEventBus,
+  projectEnvelopes,
+  type EnvelopeListener,
+  type StreamEnvelope,
+} from './stream.js';
 
 const AI_PROFILES = [
   { name: '阿序', avatar: '序', style: '谨慎观察' },
@@ -73,6 +79,11 @@ export class GameEngine {
   private readonly games = new Map<string, GameState>();
   /** 每局一条命令链:同一对局的命令串行执行,杜绝并发交错。 */
   private readonly chains = new Map<string, Promise<unknown>>();
+  /**
+   * 公开事件总线(OpenSpec 05-H · §3):命令**原子提交后**向该局 SSE 订阅者广播新增公开事件。
+   * 只读呈现通道,与写路径正交;只承载公开 `GameEvent`,绝不发射 role/word/belief/私有 prompt。
+   */
+  private readonly bus = new GameEventBus();
   /** 观察者注册表:回合公开点向其发射脱敏公开投影(见 hooks.ts)。 */
   private readonly hooks = new HookRegistry();
   /**
@@ -210,9 +221,15 @@ export class GameEngine {
   private withGame<T>(id: string, fn: (draft: GameState) => Promise<T>): Promise<T> {
     const run = (this.chains.get(id) ?? Promise.resolve()).then(async () => {
       const committed = this.requireGame(id);
+      const priorEvents = committed.events.length;
       const draft = structuredClone(committed);
       const result = await fn(draft);
       this.games.set(id, draft); // 成功才提交
+      // 单一 choke point:三条命令都经此原子提交,故在此处**提交后**广播新增公开事件即可覆盖全部写路径。
+      // 仅当确有新增才发射;afterSeq = priorEvents-1 → 新信封 seq 从 priorEvents 起,与日志下标一致。
+      if (draft.events.length > priorEvents) {
+        this.bus.publish(id, projectEnvelopes(id, draft.events, priorEvents - 1));
+      }
       return result;
     });
     // 记录命令链(吞掉错误,避免一条命令失败阻断后续),但把真实结果交回调用者。
@@ -272,6 +289,23 @@ export class GameEngine {
 
   getInternalGame(id: string): GameState {
     return this.requireGame(id);
+  }
+
+  /**
+   * 订阅某局公开事件流(SSE 用):listener 只接**新增**信封(提交后广播)。返回取消订阅句柄。
+   * 不存在的对局按 `requireGame` 抛 404,与其余读端点语义一致。
+   */
+  onGameEvents(id: string, listener: EnvelopeListener): () => void {
+    this.requireGame(id);
+    return this.bus.subscribe(id, listener);
+  }
+
+  /**
+   * 追平(catch-up):取该局自 `afterSeq`(不含)以来的全部公开信封 —— 首连全量 / 重连补发。
+   * seq 恒等于事件下标,故与 `GET` 的 `events` 同尺;订阅前先追平即可零缝衔接实时广播。
+   */
+  catchUpEnvelopes(id: string, afterSeq: number): StreamEnvelope[] {
+    return projectEnvelopes(id, this.requireGame(id).events, afterSeq);
   }
 
   /**
