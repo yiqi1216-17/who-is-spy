@@ -138,6 +138,82 @@ describe('导演 · vote 响应线性化(人在场)', () => {
   });
 });
 
+describe('导演 · 计票揭示(其他 agent 对在场所有人投票)', () => {
+  it('出局前逐张亮出每个人的票:含 AI 投向真人、AI 互投,且都排在 BALLOT_DONE 之前', () => {
+    const game = baseGame({
+      phase: 'describing',
+      round: 2,
+      votes: [
+        { voterId: 'human', targetId: 'ai-3', reason: '我最怀疑老墨', round: 1, ballot: 1 },
+        { voterId: 'ai-1', targetId: 'human', reason: '你太笃定了', round: 1, ballot: 1 },
+        { voterId: 'ai-2', targetId: 'ai-3', reason: '老墨的措辞偏', round: 1, ballot: 1 },
+        { voterId: 'ai-3', targetId: 'ai-1', reason: '阿序在带节奏', round: 1, ballot: 1 },
+        { voterId: 'ai-4', targetId: 'ai-3', reason: '跟着多数走', round: 1, ballot: 1 },
+      ],
+      events: [
+        { id: 'elim1', type: 'elimination', text: '老墨 被投出局', round: 1, playerId: 'ai-3' },
+        { id: 's', type: 'system', text: '第 2 轮开始', round: 2 },
+      ],
+    });
+    const beats = planBeats(game, 0, 'voting');
+    const votez = beats.filter((b) => b.id.startsWith('vote-'));
+    // 五张票全部逐拍亮出,顺序与票序一致(真人先,其后各 AI)。
+    expect(votez.map((b) => b.spotlight?.speakerId)).toEqual(['human', 'ai-1', 'ai-2', 'ai-3', 'ai-4']);
+    // 目标覆盖「在场所有人」:含 AI 投向真人(ai-1→human)与 AI 互投(ai-3→ai-1)。
+    expect(votez.map((b) => b.suspectId)).toEqual(['ai-3', 'human', 'ai-3', 'ai-1', 'ai-3']);
+    expect(votez.some((b) => b.suspectId === 'human')).toBe(true);
+    // AI 的票带出理由;真人的票用第二人称、不替他杜撰理由。
+    expect(votez.find((b) => b.spotlight?.speakerId === 'ai-1')?.spotlight?.text).toContain('你太笃定了');
+    expect(votez.find((b) => b.spotlight?.speakerId === 'human')?.spotlight?.text).toBe(
+      '你把票投给了「老墨」',
+    );
+    // 揭示拍是纯呈现(无 machine 事件),且全部排在权威出局判定之前。
+    expect(votez.every((b) => b.machine === undefined)).toBe(true);
+    const ballotDoneAt = beats.findIndex((b) => b.machine?.type === 'BALLOT_DONE');
+    const lastVoteAt = beats.map((b) => b.id.startsWith('vote-')).lastIndexOf(true);
+    expect(lastVoteAt).toBeLessThan(ballotDoneAt);
+  });
+
+  it('加票复投:平票局揭示首票、出局局揭示加票,两组票各归其位', () => {
+    const game = baseGame({
+      phase: 'describing',
+      round: 2,
+      votes: [
+        // 首票局(ballot 1):ai-1 与 ai-2 同票 → 平票。
+        { voterId: 'human', targetId: 'ai-1', reason: 'r', round: 1, ballot: 1 },
+        { voterId: 'ai-3', targetId: 'ai-2', reason: 'r', round: 1, ballot: 1 },
+        { voterId: 'ai-4', targetId: 'ai-1', reason: 'r', round: 1, ballot: 1 },
+        { voterId: 'ai-1', targetId: 'ai-2', reason: 'r', round: 1, ballot: 1 },
+        { voterId: 'ai-2', targetId: 'ai-1', reason: 'r', round: 1, ballot: 1 },
+        // 加票局(ballot 2):集中到 ai-1。
+        { voterId: 'human', targetId: 'ai-1', reason: 'r', round: 1, ballot: 2 },
+        { voterId: 'ai-3', targetId: 'ai-1', reason: 'r', round: 1, ballot: 2 },
+        { voterId: 'ai-4', targetId: 'ai-1', reason: 'r', round: 1, ballot: 2 },
+        { voterId: 'ai-2', targetId: 'ai-1', reason: 'r', round: 1, ballot: 2 },
+      ],
+      events: [
+        { id: 'tie1', type: 'vote_result', text: '阿序、弥生 同票，进入最终加票。', round: 1 },
+        { id: 'elim1', type: 'elimination', text: '阿序 被投出局', round: 1, playerId: 'ai-1' },
+        { id: 's', type: 'system', text: '第 2 轮开始', round: 2 },
+      ],
+    });
+    const beats = planBeats(game, 0, 'voting');
+    const kinds = beats.map((b) => (b.id.startsWith('vote-') ? `v${b.id.split('-')[2]}` : b.machine?.type));
+    // 首票局 5 张 → 平票判定 → 加票局 4 张 → 出局判定 → 交接。
+    expect(kinds).toEqual([
+      'v1', 'v1', 'v1', 'v1', 'v1',
+      'BALLOT_DONE', // tie
+      'v2', 'v2', 'v2', 'v2',
+      'BALLOT_DONE', // eliminated
+      'CONTINUE',
+      'INTRO_DONE',
+    ]);
+    // ballot 号严格由 ballotOfOutcome 推得:平票前只可能是 ballot 1,出局前是 ballot 2。
+    const beforeTie = beats.slice(0, beats.findIndex((b) => b.machine?.type === 'BALLOT_DONE'));
+    expect(beforeTie.every((b) => b.id.startsWith('vote-1-1-'))).toBe(true);
+  });
+});
+
 describe('导演 · 旁观 continue 一次跑多轮(最难路径)', () => {
   it('跨两轮的增量线性化为:证词→计票→出局→交接→证词…→终局', () => {
     // human 已出局;continue 生成第 2 轮四段(实际 3 段 AI 存活)+ 出局 + 第 3 轮 + 终局出局。

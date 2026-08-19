@@ -174,9 +174,11 @@ function Spotlightlet({
       ? '轮到你描述'
       : mode === 'vote'
         ? '投出你的一票'
-        : spotlight?.speakerId
-          ? '证词'
-          : '主持人';
+        : spotlight?.kind === 'vote'
+          ? '投票'
+          : spotlight?.speakerId
+            ? '证词'
+            : '主持人';
 
   return (
     <div className="spotlight">

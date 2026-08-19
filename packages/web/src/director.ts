@@ -15,11 +15,12 @@ import type { Phase, PresentationEvent } from './presentation/machine';
 import type { PortraitState } from './art/portraits';
 import type { GameEvent, PublicGameState, PublicPlayer } from './types';
 
-/** 聚光内容:speakerId 为 null 表示旁白/系统。 */
+/** 聚光内容:speakerId 为 null 表示旁白/系统。kind 让呈现层区分证词/投票的抬头文案。 */
 export interface Spotlight {
   readonly speakerId: string | null;
   readonly text: string;
   readonly muted: boolean;
+  readonly kind?: 'testimony' | 'vote';
 }
 
 /** 一放映拍:携带可选的机器事件与视图更新。undefined 字段表示「保持不变」,null 表示「清空」。 */
@@ -39,6 +40,7 @@ export interface Beat {
 export const HOLD = {
   testimony: 2400,
   human: 1500,
+  vote: 1300,
   tie: 2200,
   eliminate: 2800,
   continue: 1300,
@@ -69,6 +71,46 @@ export function planBeats(
   const beats: Beat[] = [];
   let control = 0;
   const controlId = (): string => `ctl-${fromEventCount}-${control++}`;
+  const nameOf = (id: string): string =>
+    game.players.find((player) => player.id === id)?.name ?? '某位玩家';
+
+  // 某个票局结果(平票/出局)对应第几次计票(ballot):数它之前**同轮**已发生的平票次数 + 1。
+  // 走**完整** game.events(而非仅本段 delta),故加票复投分多次 planBeats 调用时仍稳定对号,
+  // 不会把加票局的票错认成首票局的票。
+  const ballotOfOutcome = (outcome: GameEvent): number => {
+    let ballot = 1;
+    for (const event of game.events) {
+      if (event.id === outcome.id) break;
+      if (event.type === 'vote_result' && event.round === outcome.round) ballot += 1;
+    }
+    return ballot;
+  };
+
+  // 计票揭示(玩家模式缺口修复):把该 (round, ballot) 下**每一张票**——投票人 → 目标 + 理由——
+  // 线性化为逐拍聚光,让「其他 agent 依自己判断对在场所有人投票」在玩家眼前逐张亮出:
+  // 目标席位亮为嫌疑、投票人亮为发言,含**投向真人**与**AI 互投**(呼应 03-6 实战「票型」)。
+  // 纯呈现拍(无 machine 事件),不改剧场相位;票空(如历史用例)则回退为零拍,行为不变。
+  const revealBallot = (outcome: GameEvent): Beat[] => {
+    const ballot = ballotOfOutcome(outcome);
+    return game.votes
+      .filter((vote) => vote.round === outcome.round && vote.ballot === ballot)
+      .map((vote) => {
+        const targetName = nameOf(vote.targetId);
+        const isHumanVoter = vote.voterId === humanId;
+        return {
+          id: `vote-${outcome.round}-${ballot}-${vote.voterId}`,
+          hold: HOLD.vote,
+          focusId: vote.voterId,
+          suspectId: vote.targetId,
+          spotlight: {
+            speakerId: vote.voterId,
+            text: isHumanVoter ? `你把票投给了「${targetName}」` : `我投「${targetName}」· ${vote.reason}`,
+            muted: false,
+            kind: 'vote',
+          },
+        };
+      });
+  };
 
   let inTestimony = startPhase === 'testimony';
 
@@ -100,6 +142,7 @@ export function planBeats(
     if (inTestimony) closeTestimony('ballot');
 
     if (event.type === 'vote_result') {
+      beats.push(...revealBallot(event));
       beats.push({
         id: event.id,
         hold: HOLD.tie,
@@ -113,6 +156,7 @@ export function planBeats(
     }
 
     if (event.type === 'elimination') {
+      beats.push(...revealBallot(event));
       const finished = !moreDescriptionsAhead && game.phase === 'finished';
       beats.push({
         id: event.id,
