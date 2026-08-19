@@ -1669,6 +1669,317 @@ p {
 }
 
 /* =========================================================================
+   双模式 · 上帝视角(任务 #26)
+   —— 与玩家剧场同底(play/arena/spotlight/dock),叠加全知层:身份徽记 + 内心 OS。
+   ========================================================================= */
+
+/* 首屏 · 玩家/上帝 分段切换 */
+.mode-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-full);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  margin-bottom: var(--s4);
+}
+.mode-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--r-full);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  transition: all var(--d-fast);
+}
+.mode-switch button.active {
+  background: var(--ink);
+  color: #f3ead9;
+  box-shadow: var(--sh-1);
+}
+
+/* 靛青芯片:上帝标识(深底上浅字) */
+.god-chip {
+  background: rgba(91, 107, 147, 0.22);
+  border-color: rgba(120, 140, 180, 0.45);
+  color: #cdd6ea;
+}
+
+/* —— 解算候场 —— */
+.god-loading {
+  position: relative;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: var(--s4);
+  background: radial-gradient(120% 82% at 50% 16%, var(--stage-3), var(--stage) 72%);
+  color: #f0e6d3;
+  overflow: hidden;
+}
+.god-loading-top {
+  position: absolute;
+  top: calc(var(--safe-t) + 12px);
+  left: var(--s4);
+  right: var(--s4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 2;
+}
+.god-loading-core {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s4);
+  max-width: 32ch;
+}
+.god-loading-portraits {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--s2);
+}
+.god-loading-portraits .glp {
+  width: 78px;
+  margin: 0 -12px;
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.5));
+  animation: cardRise 0.5s var(--e-out) both;
+}
+.god-loading-portraits .glp-0 {
+  transform: rotate(-8deg) translateY(6px);
+}
+.god-loading-portraits .glp-1 {
+  transform: rotate(-3deg);
+  z-index: 2;
+  animation-delay: 90ms;
+}
+.god-loading-portraits .glp-2 {
+  transform: rotate(3deg);
+  z-index: 2;
+  animation-delay: 180ms;
+}
+.god-loading-portraits .glp-3 {
+  transform: rotate(8deg) translateY(6px);
+  animation-delay: 270ms;
+}
+.god-loading-spin {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: #aeb9d6;
+}
+.god-loading h2 {
+  font-family: var(--display);
+  font-size: var(--fs-title);
+  color: #f6eddc;
+}
+.god-loading-note {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: rgba(240, 230, 211, 0.72);
+}
+.god-loading-note strong {
+  color: #e7d3a6;
+}
+.god-loading-bar {
+  width: 200px;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.god-loading-bar i {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: linear-gradient(90deg, var(--indigo), var(--amber));
+  animation: godSweep 1.5s var(--e-out) infinite;
+}
+@keyframes godSweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+.god-loading-actions {
+  display: inline-flex;
+  gap: var(--s2);
+}
+
+/* —— 全知席位徽记(身份/密词,上帝可见) —— */
+.god-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-light);
+  color: rgba(240, 230, 211, 0.78);
+  background: rgba(15, 12, 10, 0.42);
+  white-space: nowrap;
+}
+.god-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.9;
+}
+.god-badge.spy {
+  color: #e2c2e8;
+  border-color: rgba(154, 107, 156, 0.6);
+  background: rgba(154, 107, 156, 0.24);
+}
+.god-badge.civ {
+  color: #c8ddca;
+  border-color: rgba(111, 138, 118, 0.5);
+  background: rgba(111, 138, 118, 0.2);
+}
+
+/* —— 心声控制台:仅上帝可见的内心独白 —— */
+.os-console {
+  flex-shrink: 0;
+  margin: var(--s3) var(--s4) 0;
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-lg);
+  background: linear-gradient(155deg, rgba(91, 107, 147, 0.16), rgba(91, 107, 147, 0.04)), var(--paper);
+  border: 1px dashed rgba(91, 107, 147, 0.55);
+  transition: opacity var(--d-med);
+}
+.os-console.idle {
+  opacity: 0.52;
+}
+.os-console.live {
+  animation: cardRise var(--d-med) var(--e-out);
+}
+.os-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--indigo);
+  margin-bottom: 4px;
+}
+.os-console p {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+/* —— 放映控制坞 —— */
+.god-dock {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--s3);
+}
+.god-ctl {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  box-shadow: var(--sh-1);
+  transition: transform var(--d-fast);
+}
+.god-ctl:hover {
+  transform: scale(1.06);
+}
+.god-progress {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--paper-deep);
+  overflow: hidden;
+}
+.god-progress i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: linear-gradient(90deg, var(--indigo), var(--amber));
+  transition: width var(--d-med) var(--e-out);
+}
+.god-progress-num {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* —— 上帝终局:全景幕落 —— */
+.god-finale {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: calc(var(--safe-t) + var(--s5)) var(--s5) calc(var(--safe-b) + var(--s4));
+  background: linear-gradient(180deg, #1c1710 0%, #241d15 22%, var(--paper) 22%, var(--paper) 100%);
+  overflow-y: auto;
+  scrollbar-width: none;
+  animation: godCurtain var(--d-med) var(--e-out);
+}
+.god-finale::-webkit-scrollbar {
+  display: none;
+}
+@keyframes godCurtain {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.god-finale-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s3);
+  color: #f0e6d3;
+  text-align: center;
+  padding: var(--s4) 0 var(--s5);
+}
+.god-finale-hero h2 {
+  font-family: var(--display);
+  font-size: var(--fs-hero);
+  color: #f6eddc;
+}
+.god-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+.god-finale-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-top: var(--s4);
+}
+
+/* =========================================================================
    无障碍:降低动效(决策 9 · 任务 4.4)
    ========================================================================= */
 @media (prefers-reduced-motion: reduce) {

@@ -1,4 +1,4 @@
-import type { PublicGameState } from './types';
+import type { GodGameState, PublicGameState } from './types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -32,4 +32,9 @@ export const api = {
     }),
   continue: (id: string) =>
     request<PublicGameState>(`/api/games/${id}/continue`, { method: 'POST' }),
+  // 上帝模式:一次性解算一桌全 AI 对局(耗时较长),回传含内心 OS 的上帝投影。
+  createGodGame: () =>
+    request<GodGameState>('/api/god-games', { method: 'POST' }),
+  getGodGame: (id: string) =>
+    request<GodGameState>(`/api/god-games/${id}`),
 };

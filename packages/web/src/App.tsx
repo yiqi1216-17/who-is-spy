@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { api } from './api';
-import type { PublicGameState } from './types';
+import type { GodGameState, PublicGameState } from './types';
 import {
   eliminatedRevealed,
   interactionMode,
@@ -10,10 +10,11 @@ import {
   type Spotlight,
 } from './director';
 import { initialState, overlay, reduce } from './presentation/machine';
-import { HomeScreen } from './screens/HomeScreen';
+import { HomeScreen, type HomeMode } from './screens/HomeScreen';
 import { RevealScreen } from './screens/RevealScreen';
 import { StageScreen } from './screens/StageScreen';
 import { FinaleScreen } from './screens/FinaleScreen';
+import { GodScreen } from './screens/GodScreen';
 
 /**
  * 编排器(OpenSpec 05-H · 决策 2/3 · 任务 3.x)
@@ -48,6 +49,12 @@ export function App() {
   const [error, setError] = useState('');
   const [description, setDescription] = useState('');
   const [selectedTarget, setSelectedTarget] = useState('');
+
+  // —— 双模式:首屏选择玩家/上帝;上帝态独立于玩家状态机(自成一套放映) ——
+  const [homeMode, setHomeMode] = useState<HomeMode>('human');
+  const [godGame, setGodGame] = useState<GodGameState | null>(null);
+  const [godBusy, setGodBusy] = useState(false);
+  const [godError, setGodError] = useState('');
 
   // 放映队列:beats[beatIndex] 由播放 effect 逐拍应用。
   const [beats, setBeats] = useState<Beat[]>([]);
@@ -140,8 +147,33 @@ export function App() {
     setSelectedTarget('');
   }, []);
 
-  // —— 动作:开局 / 揭示完成 / 描述 / 投票 / 旁观推进 ——
+  // —— 上帝模式:一次性解算整桌全 AI 对局(耗时较长),再交给 GodScreen 逐拍放映 ——
+  const startGod = useCallback(async () => {
+    setGodError('');
+    setGodGame(null);
+    setGodBusy(true);
+    try {
+      const created = await api.createGodGame();
+      setGodGame(created);
+    } catch (cause) {
+      setGodError(cause instanceof Error ? cause.message : '解算失败，请重试');
+    } finally {
+      setGodBusy(false);
+    }
+  }, []);
+
+  const exitGod = useCallback(() => {
+    setGodBusy(false);
+    setGodGame(null);
+    setGodError('');
+  }, []);
+
+  // —— 动作:开局(按模式分派) / 揭示完成 / 描述 / 投票 / 旁观推进 ——
   const onStart = useCallback(async () => {
+    if (homeMode === 'god') {
+      await startGod();
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -153,7 +185,7 @@ export function App() {
     } finally {
       setBusy(false);
     }
-  }, [handleFailure]);
+  }, [homeMode, startGod, handleFailure]);
 
   const onDescribe = useCallback(async () => {
     if (!game) return;
@@ -228,9 +260,27 @@ export function App() {
       : 'none';
 
   let screen;
-  if (!game || pres.phase === 'home') {
+  if (godBusy || godGame) {
     screen = (
-      <HomeScreen configured={configured} model={model} busy={busy} error={error} onStart={onStart} />
+      <GodScreen
+        game={godGame}
+        loading={godBusy}
+        error={godError}
+        onExit={exitGod}
+        onReplay={startGod}
+      />
+    );
+  } else if (!game || pres.phase === 'home') {
+    screen = (
+      <HomeScreen
+        configured={configured}
+        model={model}
+        busy={busy}
+        error={error}
+        mode={homeMode}
+        onModeChange={setHomeMode}
+        onStart={onStart}
+      />
     );
   } else if (pres.phase === 'role-reveal') {
     screen = <RevealScreen game={game} onDone={() => dispatch({ type: 'REVEAL_DONE' })} />;

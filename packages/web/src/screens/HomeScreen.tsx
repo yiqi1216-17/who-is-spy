@@ -3,27 +3,36 @@ import { CHARACTERS } from '../characters';
 import { Portrait } from '../art/portraits';
 import { Brand, InlineError } from '../components/ui';
 
+export type HomeMode = 'human' | 'god';
+
 /**
- * 首屏(OpenSpec 05-H · 任务 2.1/3.1)
+ * 首屏(OpenSpec 05-H · 任务 2.1/3.1 · 双模式入口)
  *
  * 立绘先声夺人:五张原创肖像浮于顶部,第一人称居中前置。
- * 一句留白式主张 + 抽身份 CTA + 三步玩法。竖屏优先、暖纸剧场底。
+ * 一句留白式主张 + **玩家/上帝**双模式切换 + 入局 CTA + 三步玩法。竖屏优先、暖纸剧场底。
+ *  - 玩家模式:你入局,第一人称与四位 AI 同桌博弈。
+ *  - 上帝模式:全 AI 一桌,你以全知视角旁观,可见每个 agent 的内心 OS。
  */
 export function HomeScreen({
   configured,
   model,
   busy,
   error,
+  mode,
+  onModeChange,
   onStart,
 }: {
   configured: boolean | null;
   model: string;
   busy: boolean;
   error: string;
+  mode: HomeMode;
+  onModeChange: (mode: HomeMode) => void;
   onStart: () => void;
 }) {
   const status =
     configured === null ? '确认模型中…' : configured ? `${model} 已就席` : '待配置密钥';
+  const god = mode === 'god';
 
   return (
     <div className="screen home">
@@ -42,27 +51,61 @@ export function HomeScreen({
       </div>
 
       <div className="home-hero">
+        <div className="mode-switch" role="tablist" aria-label="选择入局方式">
+          <button
+            role="tab"
+            aria-selected={!god}
+            className={!god ? 'active' : ''}
+            onClick={() => onModeChange('human')}
+          >
+            <Fingerprint size={15} />
+            玩家模式
+          </button>
+          <button
+            role="tab"
+            aria-selected={god}
+            className={god ? 'active' : ''}
+            onClick={() => onModeChange('god')}
+          >
+            <Eye size={15} />
+            上帝模式
+          </button>
+        </div>
+
         <div className="eyebrow">
           <span>01</span>
-          五人入局 · 一词之差
+          {god ? '全 AI 一桌 · 全知旁观' : '五人入局 · 一词之差'}
         </div>
         <h1>
-          别说出答案。
-          <br />
-          <em>也别暴露自己。</em>
+          {god ? (
+            <>
+              你不入局，
+              <br />
+              <em>但看得见每颗心。</em>
+            </>
+          ) : (
+            <>
+              别说出答案。
+              <br />
+              <em>也别暴露自己。</em>
+            </>
+          )}
         </h1>
         <p className="home-lede">
-          你与四位独立思考的 AI 同桌落座。每个人只看得到自己的密词，
-          真相就藏在那些看似普通的描述里。
+          {god
+            ? '四位 AI 各执一词、独立博弈，你以上帝视角逐拍回看整局——连它们没说出口的心声也一并显影。'
+            : '你与四位独立思考的 AI 同桌落座。每个人只看得到自己的密词，真相就藏在那些看似普通的描述里。'}
         </p>
 
         <div className="home-actions">
           <button className="btn btn-rust btn-block" onClick={onStart} disabled={busy}>
-            {busy ? <LoaderCircle className="spin" size={18} /> : <Fingerprint size={18} />}
-            抽取身份，进入牌局
+            {busy ? <LoaderCircle className="spin" size={18} /> : god ? <Eye size={18} /> : <Fingerprint size={18} />}
+            {god ? '开局观战，进入上帝视角' : '抽取身份，进入牌局'}
             <ArrowRight size={18} />
           </button>
-          <span className="duration">一局约 5–8 分钟 · 竖屏沉浸</span>
+          <span className="duration">
+            {god ? '解算约 20–60 秒 · 全程逐拍回放' : '一局约 5–8 分钟 · 竖屏沉浸'}
+          </span>
         </div>
 
         {configured === false && (
