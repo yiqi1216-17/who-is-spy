@@ -30,10 +30,10 @@
 
 ## 5. Add view modes and replay value
 
-- [ ] 5.1 Implement live AI theater with public events only and paired tests proving roles, words, beliefs, private prompts, and unpublished votes cannot affect its pre-finale projection.
+- [x] 5.1 Implement live AI theater with public events only and paired tests proving roles, words, beliefs, private prompts, and unpublished votes cannot affect its pre-finale projection.
 - [ ] 5.2 Unlock terminal roles, words, structured belief evolution, and evidence links only after authoritative terminal reveal; never expose free-text chain-of-thought.
 - [x] 5.3 Add fixture-backed detectors for consensus flips, self-saves, undercover blending, lone correct reads, decisive votes, callbacks, and novel safe metaphors.
-- [ ] 5.4 Rank a bounded diverse moment reel and add spoiler-safe cards; generated titles must cite event IDs and pass quote/action/outcome faithfulness checks.
+- [x] 5.4 Rank a bounded diverse moment reel and add spoiler-safe cards; generated titles must cite event IDs and pass quote/action/outcome faithfulness checks.
 - [ ] 5.5 Add consented, de-identified completion, rematch, favorite Agent, favorite moment, share, replay-intent, and playtest-preference feedback with a complete opt-out path.
 
 ## 6. Verify product completeness
