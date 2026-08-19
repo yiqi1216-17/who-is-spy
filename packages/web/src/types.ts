@@ -158,3 +158,24 @@ export interface HighlightReel {
   available: boolean;
   cards: HighlightCard[];
 }
+
+// —— 知情·去标识产品反馈(OpenSpec 05-H · 任务 5.5;镜像服务端 feedback.ts)——
+// 前端持有完整退出路径:选择「不用了」= 一个字节都不发送(零遥测)。
+// 点「提交」才构造带 consent:true 的提交体——这一步即知情同意。
+
+export type FeedbackTriState = 'yes' | 'no' | 'maybe';
+export type PlaytestPreference = 'portrait' | 'b0' | 'no_preference';
+
+/** 发往 /api/feedback 的提交体。consent 恒 true——未同意在前端根本不构造此对象。 */
+export interface FeedbackSubmission {
+  consent: true;
+  /** 仅供服务端把最爱 Agent/瞬间校验到真实对局,校验后即弃,永不入库。 */
+  gameId: string;
+  completion: 'completed' | 'abandoned';
+  rematch: FeedbackTriState;
+  favoriteAgentId: string | null;
+  favoriteMomentId: string | null;
+  share: FeedbackTriState;
+  replayIntent: FeedbackTriState;
+  playtestPreference: PlaytestPreference;
+}

@@ -1,4 +1,9 @@
-import type { GodGameState, HighlightReel, PublicGameState } from './types';
+import type {
+  FeedbackSubmission,
+  GodGameState,
+  HighlightReel,
+  PublicGameState,
+} from './types';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -42,4 +47,11 @@ export const api = {
     request<GodGameState>('/api/god-games', { method: 'POST' }),
   getGodGame: (id: string) =>
     request<GodGameState>(`/api/god-games/${id}`),
+  // 知情反馈(任务 5.5):仅当用户点「提交」才调用——consent 恒 true。
+  // 「不用了」在组件层直接 dismiss,压根不会走到这里(完整退出 = 零遥测)。
+  submitFeedback: (submission: FeedbackSubmission) =>
+    request<{ recorded: true }>('/api/feedback', {
+      method: 'POST',
+      body: JSON.stringify(submission),
+    }),
 };

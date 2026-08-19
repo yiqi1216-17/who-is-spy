@@ -2201,3 +2201,170 @@ p {
   white-space: nowrap;
   border: 0;
 }
+
+/* =========================================================================
+   本局手记 · 知情去标识反馈(任务 5.5)
+   ========================================================================= */
+.fb-card {
+  margin-top: var(--s5);
+  padding: var(--s4) var(--s4) var(--s3);
+  border-radius: var(--r-lg);
+  background: linear-gradient(168deg, var(--paper), var(--paper-2));
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--gold);
+  box-shadow: var(--sh-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+.fb-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+}
+.fb-seal {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-full);
+  background: linear-gradient(150deg, var(--gold), #a97f3d);
+  color: #fbf3e6;
+  box-shadow: 0 6px 16px rgba(169, 127, 61, 0.34);
+}
+.fb-seal.done {
+  background: linear-gradient(150deg, var(--sage), #4f6a57);
+  box-shadow: 0 6px 16px rgba(79, 106, 87, 0.34);
+}
+.fb-head h3 {
+  font-family: var(--display);
+  font-size: 1.12rem;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.fb-head p {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.fb-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.fb-q {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+/* 分段控件:三态 / playtest 偏好共用 */
+.fb-seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-full);
+  background: var(--paper-deep);
+  border: 1px solid var(--line);
+}
+.fb-seg button {
+  padding: 9px 6px;
+  border-radius: var(--r-full);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  transition: all var(--d-fast) var(--e-out);
+}
+.fb-seg button:not(.on):hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+.fb-seg button.on {
+  background: linear-gradient(150deg, var(--rust), var(--rust-dark));
+  color: #fbf3e6;
+  box-shadow: 0 4px 12px rgba(142, 56, 37, 0.28);
+}
+/* 最难忘 Agent:头像 chip */
+.fb-agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.fb-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 5px;
+  border-radius: var(--r-full);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-size: 0.82rem;
+  color: var(--ink-2);
+  transition: all var(--d-fast) var(--e-out);
+}
+.fb-agent .mini-pt {
+  width: 26px;
+  height: 26px;
+}
+.fb-agent:not(.on):hover {
+  border-color: var(--line-strong);
+}
+.fb-agent.on {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 16%, var(--paper));
+  box-shadow: 0 0 0 1px var(--gold);
+  color: var(--ink);
+}
+/* 最爱瞬间:标题 chip */
+.fb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.fb-chip {
+  padding: 7px 13px;
+  border-radius: var(--r-full);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-size: 0.8rem;
+  color: var(--ink-2);
+  transition: all var(--d-fast) var(--e-out);
+}
+.fb-chip:not(.on):hover {
+  border-color: var(--line-strong);
+}
+.fb-chip.on {
+  border-color: var(--rust);
+  background: color-mix(in srgb, var(--rust) 12%, var(--paper));
+  color: var(--rust-dark);
+  font-weight: 600;
+}
+.fb-actions {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s3);
+  margin-top: var(--s1);
+}
+.fb-error {
+  font-size: 0.8rem;
+  color: var(--rust-dark);
+}
+.fb-consent {
+  font-size: 0.68rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  opacity: 0.9;
+}
+.fb-thanks {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--s3);
+}
+.fb-thanks p {
+  font-size: 0.9rem;
+  color: var(--ink-2);
+}

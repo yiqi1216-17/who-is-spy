@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
+  Check,
   ChevronDown,
   Compass,
   Crosshair,
@@ -7,9 +8,11 @@ import {
   EyeOff,
   Film,
   Link2,
+  MessageSquareHeart,
   RotateCcw,
   Scale,
   ScrollText,
+  Send,
   ShieldCheck,
   Shuffle,
   Sparkle,
@@ -22,7 +25,21 @@ import { characterFor } from '../characters';
 import { Portrait } from '../art/portraits';
 import { api } from '../api';
 import { citationLabel, formatMeasure, metaFor } from '../highlights';
-import type { HighlightCard, HighlightReel, PublicGameState, Role } from '../types';
+import {
+  EMPTY_DRAFT,
+  PLAYTEST_LABELS,
+  TRI_LABELS,
+  toSubmission,
+  type FeedbackDraft,
+} from '../feedback';
+import type {
+  FeedbackTriState,
+  HighlightCard,
+  HighlightReel,
+  PlaytestPreference,
+  PublicGameState,
+  Role,
+} from '../types';
 
 type Tab = 'identity' | 'highlights' | 'review' | 'ballot';
 
@@ -81,6 +98,8 @@ export function FinaleScreen({ game, onRestart }: { game: PublicGameState; onRes
           {tab === 'review' && <ReviewView game={game} />}
           {tab === 'ballot' && <BallotView game={game} />}
         </div>
+
+        <FeedbackCard game={game} />
       </div>
 
       <div className="finale-footer">
@@ -413,6 +432,210 @@ function SpoilerPanel({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * 本局手记(OpenSpec 05-H · 任务 5.5):知情、去标识、可完整退出的产品反馈。
+ *
+ * 完整退出路径就在这里:选择「不用了」→ 组件直接卸载,**一个字节都不发送**(零遥测)。
+ * 只有点「提交手记」才由 `toSubmission` 构造带 `consent:true` 的提交体——这一步即知情同意。
+ * 表单只有枚举选项与稳定引用,没有任何自由文本框:结构上就无从夹带 PII。
+ * 最爱瞬间的选项复用默认层(剧透安全)高光卡,幂等 GET;拉取失败则静默隐藏该问,不阻塞提交。
+ */
+function FeedbackCard({ game }: { game: PublicGameState }) {
+  const [stage, setStage] = useState<'form' | 'thanks' | 'dismissed'>('form');
+  const [draft, setDraft] = useState<FeedbackDraft>(EMPTY_DRAFT);
+  const [moments, setMoments] = useState<HighlightCard[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .highlights(game.id, false)
+      .then((reel) => {
+        if (!cancelled) setMoments(reel.cards);
+      })
+      .catch(() => {
+        /* 高光拉取失败不影响反馈:仅隐藏「最爱瞬间」一问。 */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [game.id]);
+
+  if (stage === 'dismissed') return null;
+
+  if (stage === 'thanks') {
+    return (
+      <section className="fb-card fb-thanks" aria-live="polite">
+        <span className="fb-seal done">
+          <Check size={16} />
+        </span>
+        <p>手记已收好,谢谢你陪这局走到最后。</p>
+      </section>
+    );
+  }
+
+  const aiPlayers = game.players.filter((player) => !player.isHuman);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.submitFeedback(toSubmission(draft, game.id));
+      setStage('thanks');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '提交失败,稍后再试');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="fb-card" aria-label="本局手记">
+      <header className="fb-head">
+        <span className="fb-seal">
+          <MessageSquareHeart size={16} />
+        </span>
+        <div>
+          <h3>留下一句手记</h3>
+          <p>匿名收集,只为把这张牌桌打磨得更好——随时可跳过。</p>
+        </div>
+      </header>
+
+      <FbTri
+        label="还想再来一局吗"
+        value={draft.rematch}
+        onChange={(rematch) => setDraft((prev) => ({ ...prev, rematch }))}
+      />
+      <FbTri
+        label="会分享给朋友吗"
+        value={draft.share}
+        onChange={(share) => setDraft((prev) => ({ ...prev, share }))}
+      />
+      <FbTri
+        label="会想回看这一局吗"
+        value={draft.replayIntent}
+        onChange={(replayIntent) => setDraft((prev) => ({ ...prev, replayIntent }))}
+      />
+
+      <FbGroup label="最难忘的 Agent">
+        <div className="fb-agents">
+          {aiPlayers.map((player) => {
+            const character = characterFor(player.id);
+            const on = draft.favoriteAgentId === player.id;
+            return (
+              <button
+                type="button"
+                key={player.id}
+                className={`fb-agent ${on ? 'on' : ''}`}
+                aria-pressed={on}
+                onClick={() =>
+                  setDraft((prev) => ({ ...prev, favoriteAgentId: on ? null : player.id }))
+                }
+              >
+                <Portrait character={character} state="idle" emblem className="mini-pt" />
+                <span>{character.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </FbGroup>
+
+      {moments.length > 0 && (
+        <FbGroup label="最爱的瞬间">
+          <div className="fb-chips">
+            {moments.map((card) => {
+              const on = draft.favoriteMomentId === card.id;
+              return (
+                <button
+                  type="button"
+                  key={card.id}
+                  className={`fb-chip ${on ? 'on' : ''}`}
+                  aria-pressed={on}
+                  onClick={() =>
+                    setDraft((prev) => ({ ...prev, favoriteMomentId: on ? null : card.id }))
+                  }
+                >
+                  {card.title}
+                </button>
+              );
+            })}
+          </div>
+        </FbGroup>
+      )}
+
+      <FbGroup label="更喜欢哪种界面">
+        <div className="fb-seg" role="group" aria-label="更喜欢哪种界面">
+          {(['portrait', 'b0', 'no_preference'] as PlaytestPreference[]).map((option) => (
+            <button
+              type="button"
+              key={option}
+              className={draft.playtestPreference === option ? 'on' : ''}
+              aria-pressed={draft.playtestPreference === option}
+              onClick={() => setDraft((prev) => ({ ...prev, playtestPreference: option }))}
+            >
+              {PLAYTEST_LABELS[option]}
+            </button>
+          ))}
+        </div>
+      </FbGroup>
+
+      {error && <p className="fb-error">{error}</p>}
+
+      <div className="fb-actions">
+        <button type="button" className="btn btn-ghost" onClick={() => setStage('dismissed')} disabled={busy}>
+          不用了
+        </button>
+        <button type="button" className="btn btn-rust" onClick={submit} disabled={busy}>
+          <Send size={15} />
+          {busy ? '提交中…' : '提交手记'}
+        </button>
+      </div>
+
+      <p className="fb-consent">
+        点「提交手记」即表示同意匿名收集以上选项。表单不含任何文字输入,提交后仅保留跨局聚合统计,不记录对局身份。
+      </p>
+    </section>
+  );
+}
+
+function FbTri({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: FeedbackTriState;
+  onChange: (value: FeedbackTriState) => void;
+}) {
+  return (
+    <div className="fb-group">
+      <span className="fb-q">{label}</span>
+      <div className="fb-seg" role="group" aria-label={label}>
+        {(['yes', 'maybe', 'no'] as FeedbackTriState[]).map((option) => (
+          <button
+            type="button"
+            key={option}
+            className={value === option ? 'on' : ''}
+            aria-pressed={value === option}
+            onClick={() => onChange(option)}
+          >
+            {TRI_LABELS[option]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FbGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="fb-group">
+      <span className="fb-q">{label}</span>
+      {children}
     </div>
   );
 }
