@@ -209,6 +209,9 @@ const hookPayloadSchema = z
 const traceEventSchema = z
   .object({
     correlationId: z.string().min(1),
+    // 「哪一局」维度(题面任务线③验收):由 AsyncLocalStorage 对局作用域隐式注入,
+    // 离线直发(不在任何对局作用域)时缺省。gameId 是公开 DTO 字段,非机密。
+    gameId: z.string().min(1).optional(),
     round: z.number().int().nonnegative(),
     ballot: z.number().int().positive().optional(),
     boundary: z.enum(['model.describe', 'model.vote', 'model.review', 'hook']),

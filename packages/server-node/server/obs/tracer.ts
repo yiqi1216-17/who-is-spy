@@ -1,6 +1,7 @@
 import type { HookEmitResult } from '../hooks.js';
 import { scanSecrets } from '../redaction.js';
 import { type TraceEvent, type Versioned, envelope, parseVersioned } from '../schema.js';
+import { currentGameId } from './game-scope.js';
 
 /**
  * 脱敏 trace 汇(OpenSpec 04 · Task 3.1 / 3.2)
@@ -77,6 +78,10 @@ export class MemoryTraceSink implements TraceSink {
     return this.log.filter((event) => event.data.correlationId === correlationId);
   }
 
+  byGame(gameId: string): Versioned<'traceEvent'>[] {
+    return this.log.filter((event) => event.data.gameId === gameId);
+  }
+
   clear(): void {
     this.log.length = 0;
   }
@@ -90,7 +95,11 @@ export class MemoryTraceSink implements TraceSink {
  */
 export function emitTrace(sink: TraceSink, fields: TraceEvent): Versioned<'traceEvent'> {
   if (fields.policyCode !== undefined) assertPolicyCode(fields.policyCode);
-  const validated = parseVersioned('traceEvent', envelope('traceEvent', fields));
+  // 「哪一局」维度在**单一收口点**补齐:所有发射方(TracedModel 传输世系 / 引擎决策纠偏 /
+  // hook 边界)都经本函数落汇,对局作用域内自动归属局号;作用域外(离线单测直发)保持缺省。
+  const gameId = fields.gameId ?? currentGameId();
+  const scoped: TraceEvent = gameId === undefined ? fields : { ...fields, gameId };
+  const validated = parseVersioned('traceEvent', envelope('traceEvent', scoped));
   const event = envelope('traceEvent', validated);
   sink.record(event);
   return event;

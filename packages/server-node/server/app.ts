@@ -15,6 +15,7 @@ import { GameEngine, GameRuleError } from './game-engine.js';
 import { DeepSeekClient, ModelError, type GameModel } from './model.js';
 import { MemoryTraceSink } from './obs/tracer.js';
 import { TracedModel } from './obs/traced-model.js';
+import { FaultSwitch, registerOpsRoutes } from './ops.js';
 import {
   STREAM_VERSION,
   formatEnd,
@@ -33,7 +34,14 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
   //   决策纠偏(质量拒稿,含 hash/length 指纹)+ hook 边界由引擎打点。
   // 二者同汇 → 统一世系;生产取有限环形上限,避免长跑无界增长。trace 只在服务端,绝不进 DTO。
   const traceSink = new MemoryTraceSink(2000);
-  const tracedModel = new TracedModel(model, { sink: traceSink, now: () => performance.now() });
+  // 观测台(题面任务线③前端呈现 · 附加端点):故障开关只在**非生产**装进模型链——
+  // 生产链是 TracedModel 直包真实模型,结构上无故障面(生产禁用第 2 重闸,详见 ops.ts)。
+  const devOps = process.env.NODE_ENV !== 'production';
+  const faultSwitch = devOps ? new FaultSwitch(model) : null;
+  const tracedModel = new TracedModel(faultSwitch ?? model, {
+    sink: traceSink,
+    now: () => performance.now(),
+  });
   const engine = new GameEngine(tracedModel, undefined, {
     sink: traceSink,
     now: () => performance.now(),
@@ -209,6 +217,11 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
     response.json(feedback.summary());
   });
 
+  // —— 观测台端点(仅开发环境挂载;生产 /api/ops/* 一律 404 —— 生产禁用第 1 重闸)——
+  if (devOps && faultSwitch) {
+    registerOpsRoutes(app, { sink: traceSink, faults: faultSwitch });
+  }
+
   if (process.env.NODE_ENV === 'production') {
     const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
     const distDirectory = path.resolve(currentDirectory, '../../web/dist');
@@ -250,5 +263,5 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
     },
   );
 
-  return { app, engine, traceSink };
+  return { app, engine, traceSink, faultSwitch };
 }

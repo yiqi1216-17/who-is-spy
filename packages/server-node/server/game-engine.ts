@@ -6,6 +6,7 @@ import { type QualityCode, evaluateDescription } from './quality-policy.js';
 import { type HookFn, HookRegistry } from './hooks.js';
 import { emptyBelief, observeRound } from './beliefs.js';
 import { safeDigest } from './redaction.js';
+import { runInGameScope } from './obs/game-scope.js';
 import { type TraceSink, emitTrace, traceHookResults } from './obs/tracer.js';
 import { type ReplayLog, buildReplayLog } from './replay/log.js';
 import { type ReconstructedTimeline, reconstructTimeline } from './replay/replay.js';
@@ -224,7 +225,8 @@ export class GameEngine {
       const committed = this.requireGame(id);
       const priorEvents = committed.events.length;
       const draft = structuredClone(committed);
-      const result = await fn(draft);
+      // 对局作用域:命令体内(含模型调用/质量纠偏/hook)发射的 trace 自动归属本局(「哪一局」维度)。
+      const result = await runInGameScope(id, () => fn(draft));
       this.games.set(id, draft); // 成功才提交
       // 单一 choke point:三条命令都经此原子提交,故在此处**提交后**广播新增公开事件即可覆盖全部写路径。
       // 仅当确有新增才发射;afterSeq = priorEvents-1 → 新信封 seq 从 priorEvents 起,与日志下标一致。
@@ -499,7 +501,9 @@ export class GameEngine {
         for (const agent of game.players.filter((player) => player.alive)) {
           const visible = [...game.descriptions, ...produced];
           const contextGame: GameState = { ...game, descriptions: visible };
-          const { text, thought } = await this.gatedDescribe(contextGame, agent, visible, true);
+          const { text, thought } = await runInGameScope(game.id, () =>
+            this.gatedDescribe(contextGame, agent, visible, true),
+          );
           produced.push({ playerId: agent.id, text, round: game.round });
           if (thought) thoughts.push({ round: game.round, playerId: agent.id, text: thought });
         }
@@ -517,9 +521,9 @@ export class GameEngine {
         game.ballot = 1;
         game.eligibleTargetIds = null;
       } else {
-        const votes = await this.generateVotes(game);
+        const votes = await runInGameScope(game.id, () => this.generateVotes(game));
         game.votes.push(...votes);
-        await this.resolveBallot(game, votes);
+        await runInGameScope(game.id, () => this.resolveBallot(game, votes));
       }
     }
     if (safety >= 12 && !this.isFinished(game)) {
