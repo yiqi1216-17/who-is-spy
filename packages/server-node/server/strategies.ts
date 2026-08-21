@@ -1,60 +1,20 @@
 import type { Strategy } from './schema.js';
 import type { Player, StrategyView } from './types.js';
+import { TRANSFER_STRATEGIES } from './strategies.data.js';
 
 /**
- * 种子策略原型(OpenSpec 03 · §4 的手写起点)
+ * 种子策略原型(OpenSpec 03 · §4;C 阶段语料回填已完成,tasks 4.1/4.2)
  *
  * 四个角色各持一份可解释策略:persona 是性格标签,tactics 是话术倾向,
  * specificity/novelty/risk 三个连续量分别指示描述的具体度、换角度倾向、冒险度。
- * 现阶段诚实标注为 synthetic(手写);C 阶段用真实语料抽取的分布回填替换,
- * 届时只换这份数据、不动编排代码(这正是策略与代码解耦的价值)。
+ *
+ * v1 是手写 synthetic 种子(见 git 历史);v2 起改为 **transfer 实测分布**——
+ * werewolf-among-us train split(109 局、475 个玩家样本)句级说服策略标注的
+ * 簇统计,由 `npm run data:strategies` 生成 `strategies.data.ts`(勿手改),
+ * 溯源见 provenance.sampleIds 与 data/normalized/strategy-extraction-report.json。
+ * 本次替换只动数据、不动编排代码——正是策略与代码解耦的价值兑现。
  */
-export const SEED_STRATEGIES: readonly Strategy[] = [
-  {
-    id: 'cautious-observer',
-    version: 1,
-    role: 'any',
-    persona: '谨慎观察',
-    tactics: ['先给上位概念', '回避独有细节', '留有余地不抢先定性'],
-    specificity: 0.35,
-    novelty: 0.5,
-    risk: 0.2,
-    provenance: { kind: 'synthetic' },
-  },
-  {
-    id: 'intuitive-reader',
-    version: 1,
-    role: 'any',
-    persona: '直觉敏锐',
-    tactics: ['抓整体感觉与联想', '用氛围与情绪词', '顺着场上语气接话'],
-    specificity: 0.45,
-    novelty: 0.7,
-    risk: 0.45,
-    provenance: { kind: 'synthetic' },
-  },
-  {
-    id: 'logical-deducer',
-    version: 1,
-    role: 'any',
-    persona: '逻辑派',
-    tactics: ['结构化归类', '强调功能与用途', '对齐并比对他人措辞'],
-    specificity: 0.55,
-    novelty: 0.4,
-    risk: 0.35,
-    provenance: { kind: 'synthetic' },
-  },
-  {
-    id: 'wildcard',
-    version: 1,
-    role: 'any',
-    persona: '出其不意',
-    tactics: ['换一个新颖角度', '制造反差', '避免与前面雷同'],
-    specificity: 0.5,
-    novelty: 0.85,
-    risk: 0.6,
-    provenance: { kind: 'synthetic' },
-  },
-];
+export const SEED_STRATEGIES: readonly Strategy[] = TRANSFER_STRATEGIES;
 
 /** 完整策略 → 投影视图(剥离来源/ID/version 等元数据,只留渲染所需)。 */
 export function projectStrategy(strategy: Strategy): StrategyView {

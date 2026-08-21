@@ -26,7 +26,14 @@ const BELIEF_MARKERS = ['suspicions', 'selfExposure', 'evidenceRefs'];
 /** 内部完整状态独有字段:投影后不该出现。 */
 const INTERNAL_MARKERS = ['createdAt'];
 /** 策略溯源 / 私有原型元数据:投影严格剥离,不该出现在任何跨界工件。 */
-const PROVENANCE_MARKERS = ['provenance', 'synthetic', 'sampleIds', 'cautious-observer'];
+const PROVENANCE_MARKERS = [
+  'provenance',
+  'synthetic',
+  'transfer',
+  'sampleIds',
+  'interrogator-probe', // v2 transfer 策略的 id(v1 的 cautious-observer 已退役)
+  'werewolf-among-us', // 语料 gameId 前缀:样本溯源绝不该漏进任何跨界工件
+];
 /** 未结算票标记:选票结构绝不进 model 上下文。 */
 const VOTE_MARKERS = ['voterId'];
 

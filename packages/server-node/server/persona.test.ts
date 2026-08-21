@@ -13,7 +13,8 @@ import { FakeGameModel } from './test-utils.js';
  */
 
 const DETERMINISTIC = () => 0;
-const STYLES = ['谨慎观察', '直觉敏锐', '逻辑派', '出其不意'];
+// 不锚定具体文案:persona 集合以种子策略数据为准(v2 起由语料抽取生成,文案可随数据演进)
+const STYLES = SEED_STRATEGIES.map((s) => s.persona);
 
 describe('B4 · 策略传导通道', () => {
   it('每个 AI 的上下文都带 strategy 投影(persona/tactics/三个连续量)', async () => {
@@ -83,9 +84,14 @@ describe('B4 · 种子策略符合 schema', () => {
     }
     // id 唯一
     expect(new Set(SEED_STRATEGIES.map((s) => s.id)).size).toBe(4);
-    // 种子策略诚实标注为合成来源(C 阶段用真实数据回填替换)
+    // C 阶段语料回填已完成:策略诚实标注为 transfer(跨游戏人类证据,永不谎称 human),
+    // 且每份都带可追溯的代表样本(⊆ train split)
     for (const strategy of SEED_STRATEGIES) {
-      expect(strategy.provenance.kind).toBe('synthetic');
+      expect(strategy.provenance.kind).toBe('transfer');
+      expect(strategy.provenance.sampleIds?.length).toBeGreaterThan(0);
+      for (const id of strategy.provenance.sampleIds ?? []) {
+        expect(id).toMatch(/^werewolf-among-us:/);
+      }
     }
   });
 });
