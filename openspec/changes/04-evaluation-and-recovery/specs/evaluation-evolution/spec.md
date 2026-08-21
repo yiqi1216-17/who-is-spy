@@ -54,3 +54,23 @@ Human comparative evaluations SHALL randomize candidate labels and presentation 
 #### Scenario: Evaluator compares two agent versions
 - **WHEN** a participant judges which output is more natural or entertaining
 - **THEN** the participant cannot see model, strategy, or version identifiers before submitting the choice
+
+### Requirement: Faction win-rate responds to strategy skill
+
+The evaluation system SHALL provide a per-faction win-rate comparison in which successive strategy iterations, run on identical seeds, random streams, and scripted human co-players, change civilian and undercover win-rates as a measurable function of strategy skill alone. Each step SHALL report the civilian and undercover win-rate deltas and whether the observed swing matches the declared intent, and the command SHALL exit non-zero if any step's swing contradicts its intent or any iteration fails to complete. Vote and description decisions in this mode MUST derive only from public descriptions and the agent's own identity, never from another player's hidden role or word.
+
+#### Scenario: Civilian iteration raises the civilian win-rate
+- **WHEN** an iteration improves civilian identification skill while the undercover configuration is held fixed, on the same seed as the prior iteration
+- **THEN** the reported civilian win-rate increases relative to the prior iteration and the step is marked as swinging toward civilians
+
+#### Scenario: Undercover counter-iteration raises the undercover win-rate
+- **WHEN** a later iteration improves undercover blending and misdirection against the same civilian skill
+- **THEN** the reported undercover win-rate increases relative to the prior iteration and the step is marked as swinging toward the undercover
+
+#### Scenario: Win-rate swings are deterministic and complete
+- **WHEN** the same iteration ladder is run twice on one seed
+- **THEN** the per-iteration win-rates are byte-identical and every iteration reaches a terminal winner rather than aborting
+
+#### Scenario: Skill mode reads only public information
+- **WHEN** an agent decides its vote in win-rate mode
+- **THEN** the decision is computed solely from published descriptions and the agent's own role and word, and no accepted vote targets a hidden field or an out-of-bounds player

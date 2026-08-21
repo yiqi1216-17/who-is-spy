@@ -60,3 +60,12 @@
 - [ ] 6.2 Run a budget-capped DeepSeek comparison, label live latency/cost separately from fixtures, and preserve only redacted reports.
 - [ ] 6.3 Produce a concise B0–B3/champion scorecard with ablations, sample limitations, failures, recovery evidence, and no unsupported superiority claim.
 - [ ] 6.4 Run Node tests, build, `contract:node`, strict OpenSpec validation, and independent evaluation/privacy review; record residual risks before archive.
+
+## 7. Faction win-rate arms race
+
+> **本轮交付(2026-08-21)**:回答题面②真正问的问题——不是「描述有没有差异化」(那是 §5.3 compare 钉的描述质量),而是「学到更强策略后,**平民/卧底哪一方更容易赢**」。给出一条 civ↑→spy↑→civ↑ 的军备竞赛曲线,并把技能档位标定在**可追溯的语料胜负信号**上。
+> 关键工程:整条线经引擎**可注入 `resolveStrategy`**(§5.3 同一缝)实现,投票由技能驱动但只读公开信息——**零契约变更(contract 28/0)、终局前隔离不变量原样保持**。
+
+- [x] 7.1 Mine faction win/loss correlation from raw human transfer data to ground the skill tiers (no fabricated numbers). — `corpus/mine-outcomes.ts` 从 raw werewolf 的 `votingOutcome`/`endRoles`(extract-strategies 丢弃的那一半)挖出:村民类比方经验胜率 **58.8%**、四说服话风簇获胜占比 **48%–57%**——证实「阵营与话风都对胜负有可测影响」。ONUW 简化处决判定 + 玩家级话风→阵营→胜负 join,**只统计 train split**(泄漏隔离)。`npm run data:outcomes` → `data/normalized/outcome-correlation-report.json`(仅聚合占比+样本数,无逐局泄漏)。证:`corpus/mine-outcomes.test.ts`(9)——判定纯函数六向 + 端到端确定性 + train 过滤 + 胜/败方 winRate 方向。
+- [x] 7.2 Drive votes by skill on public information alone so faction win-rate becomes a function of strategy. — `eval/arms-race-model.ts` `ArmsRaceModel`:描述由词决定「锚句簇」(平民同词聚簇、卧底异词离群);平民按公开描述**离群度**锁定卧底(概率=civSkill,可选跨轮累计),卧底以 spyBlend 借用平民锚句「融入」、以 spyDeflect「转移火力」投向最像平民者。**只读 `publicDescriptions` + 自身身份**,绝不触碰他人 role/word;技能门用 FNV 哈希取伪随机,无 Math.random/无墙钟 → 逐字节可复现。证:`arms-race.test.ts` 因果性 2 例(仅换 civSkill/spyBlend 胜率显著改变)+ 隔离例(AI 零非法票、不自投)。
+- [x] 7.3 Report per-step civilian/undercover win-rate deltas with a swing-direction verdict, deterministic and complete. — `eval/arms-race.ts`:四档技能 `baseline→civ-awake→spy-counter→civ-refined`,逐步胜率 diff + 摆动方向断言(期望 vs 实际)+ Markdown/JSONL 渲染;`tools/arms-race.ts`(`npm run arms-race:node`,`--games/--seed/--log/--report/--json`)摆动不成立或有未完局即 **exit 1**;落盘前 `scanSecrets` 双保险。实测(seed=7,80 局):平民胜率 **65%→83.8%→62.5%→80%**,三步摆动 civ↑→spy↑→civ↑ 全部成立、**100% 完局**。证据 `docs/evidence/04-arms-race.md`(+`.jsonl`);验收 `arms-race.test.ts`(7)——复现/方向/非单调曲线/因果/隔离脱敏。
