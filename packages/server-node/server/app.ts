@@ -21,6 +21,7 @@ import {
   STREAM_VERSION,
   formatEnd,
   formatEnvelope,
+  formatPreview,
   parseLastEventId,
   type StreamEnvelope,
 } from './stream.js';
@@ -170,11 +171,14 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
       }
 
       const off = engine.onGameEvents(id, send);
+      // 生成途中的瞬态预告帧(异步发言感):无 id 行 → 不参与 Last-Event-ID 补发;权威对账不受影响。
+      const offPreview = engine.onPreviews(id, (frame) => response.write(formatPreview(frame)));
       const heartbeat = setInterval(() => response.write(': hb\n\n'), 15000);
       heartbeat.unref?.();
       request.on('close', () => {
         clearInterval(heartbeat);
         off();
+        offPreview();
       });
     } catch (error) {
       next(error);

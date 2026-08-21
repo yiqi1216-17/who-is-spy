@@ -18,7 +18,7 @@ export function RevealScreen({ game, onDone }: { game: PublicGameState; onDone: 
       <Brand />
       <p className="reveal-note">Private Briefing · 仅本机可见</p>
       <h2>{open ? '记住它，然后藏好。' : '你的身份已封入信笺。'}</h2>
-      <p className="reveal-sub">身边有人拿到了相近、却不同的词。</p>
+      <p className="reveal-sub">五人中随机一位是卧底——这次也可能是你。</p>
 
       <button
         className={`envelope ${open ? 'open' : ''}`}

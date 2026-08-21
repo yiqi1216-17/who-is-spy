@@ -5,10 +5,12 @@ import {
   eliminatedRevealed,
   interactionMode,
   planBeats,
+  testimonyHold,
   type Beat,
   type Interaction,
   type Spotlight,
 } from './director';
+import { followGame, type Follower } from './stream';
 import { initialState, overlay, reduce } from './presentation/machine';
 import { HomeScreen, type HomeMode } from './screens/HomeScreen';
 import { RevealScreen } from './screens/RevealScreen';
@@ -63,6 +65,10 @@ export function App() {
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(() => new Set());
   const appliedRef = useRef<Set<string>>(new Set());
 
+  // 生成途中已被 SSE 预告帧直播过的证词键(`round:playerId`):
+  // 命令返回后 planBeats 据此只做快速回带,不再全时长重放(异步发言感)。
+  const liveSeenRef = useRef<Set<string>>(new Set());
+
   const queueEmpty = beatIndex >= beats.length;
 
   // —— 开机自检:确认模型是否就席 ——
@@ -80,6 +86,44 @@ export function App() {
       alive = false;
     };
   }, []);
+
+  // —— 生成直播(体验修复:异步发言感)——
+  // 每局挂一条 SSE:AI 每说完一句,服务端立刻推瞬态预告帧;此刻 HTTP 命令仍在途、
+  // 放映队列空转,预告帧直接点亮席位与聚光(全时长自适应停留),观众即时读到。
+  // 命令返回后 planBeats 见 liveSeen 只做 0.6s 快速回带,状态机/揭示记账照常,权威性不受影响。
+  const gameId = game?.id ?? null;
+  useEffect(() => {
+    if (!gameId) return;
+    liveSeenRef.current = new Set();
+    let follower: Follower | null = null;
+    let clearTimer: number | undefined;
+    try {
+      follower = followGame(gameId, {
+        onEvent: () => {}, // 权威事件仍由 HTTP 响应统一放映(单一放映管线)
+        onPreview: (frame) => {
+          liveSeenRef.current.add(`${frame.round}:${frame.playerId}`);
+          setView((prev) => ({
+            ...prev,
+            focusId: frame.playerId,
+            spotlight: { speakerId: frame.playerId, text: frame.text, muted: false },
+          }));
+          // 一句读完后回到「斟酌中」留白,等下一句;命令返回起播时该定时器已被新拍覆盖。
+          if (clearTimer !== undefined) window.clearTimeout(clearTimer);
+          clearTimer = window.setTimeout(() => {
+            setView((prev) =>
+              prev.focusId === frame.playerId ? { ...prev, focusId: null, spotlight: null } : prev,
+            );
+          }, testimonyHold(frame.text));
+        },
+      });
+    } catch {
+      // EventSource 不可用(极老环境):静默回退为原「等待→整段放映」体验。
+    }
+    return () => {
+      if (clearTimer !== undefined) window.clearTimeout(clearTimer);
+      follower?.close();
+    };
+  }, [gameId]);
 
   // —— 播放 effect:应用当前拍 → 定时推进下一拍 ——
   useEffect(() => {
@@ -199,7 +243,7 @@ export function App() {
       setGame(next);
       setDescription('');
       dispatch({ type: 'HUMAN_DESCRIBED' });
-      startSegment(planBeats(next, from, 'testimony'));
+      startSegment(planBeats(next, from, 'testimony', liveSeenRef.current));
     } catch (cause) {
       handleFailure(cause);
     } finally {
@@ -234,7 +278,7 @@ export function App() {
     try {
       const next = await api.continue(game.id);
       setGame(next);
-      startSegment(planBeats(next, from, pres.phase));
+      startSegment(planBeats(next, from, pres.phase, liveSeenRef.current));
     } catch (cause) {
       handleFailure(cause);
     } finally {

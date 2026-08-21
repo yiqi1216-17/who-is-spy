@@ -55,6 +55,16 @@ export function resyncFrom(events: readonly GameEvent[]): FollowState {
   return { lastSeq: events.length - 1, events: [...events], needsResync: false };
 }
 
+/** 生成途中的瞬态预告帧(服务端 formatPreview 同构):无 seq、不入权威日志。 */
+export interface PreviewFrame {
+  readonly v: number;
+  readonly gameId: string;
+  readonly kind: 'description';
+  readonly round: number;
+  readonly playerId: string;
+  readonly text: string;
+}
+
 /** 最小 EventSource 抽象:便于以假源在无浏览器环境下测试跟播粘合层。 */
 export interface EventSourceLike {
   addEventListener(type: string, listener: (event: { data: string }) => void): void;
@@ -73,6 +83,7 @@ export function followGame(
   gameId: string,
   handlers: {
     onEvent: (event: GameEvent, seq: number) => void;
+    onPreview?: (frame: PreviewFrame) => void;
     onResync?: () => void;
     onEnd?: () => void;
   },
@@ -93,6 +104,18 @@ export function followGame(
     if (next.needsResync && !state.needsResync) handlers.onResync?.();
     else if (next.lastSeq > state.lastSeq) handlers.onEvent(envelope.event, envelope.seq);
     state = next;
+  });
+
+  // 瞬态预告帧:直通回调,不进 seq 去重(它没有 seq;权威性由后续事件信封兜底)。
+  source.addEventListener('preview', (raw) => {
+    if (!handlers.onPreview) return;
+    let frame: PreviewFrame;
+    try {
+      frame = JSON.parse(raw.data) as PreviewFrame;
+    } catch {
+      return;
+    }
+    if (frame.kind === 'description' && frame.gameId === gameId) handlers.onPreview(frame);
   });
 
   source.addEventListener('end', () => {

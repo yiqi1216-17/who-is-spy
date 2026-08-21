@@ -210,7 +210,7 @@ function Dock(props: StageProps) {
   const { mode, game } = props;
 
   if (mode === 'describe') {
-    // 已提交:真实模型下四位 AI 依次发言约需一分钟——收起输入、明示进度,杜绝「点了没反应」与连点重发。
+    // 已提交:AI 逐个发言并经预告帧实时直播到上方聚光区;此处只留轻量进度说明。
     if (props.busy) {
       return (
         <div className="dock">
@@ -218,7 +218,7 @@ function Dock(props: StageProps) {
             <LoaderCircle className="spin" size={20} />
             <div>
               <strong>描述已提交</strong>
-              <small>四位 AI 正在依次组织发言，约需一分钟，请稍候…</small>
+              <small>四位 AI 正在依次发言——每说完一句会实时亮在上方聚光区</small>
             </div>
           </div>
         </div>

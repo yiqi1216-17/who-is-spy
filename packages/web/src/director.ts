@@ -47,6 +47,14 @@ export const HOLD = {
   bridge: 220,
 } as const;
 
+/**
+ * 证词停留时长按文本长度自适应(体验修复:「跳得极快」):
+ * 基线 1.6s + 每个字 ~110ms(中文默读速度),封顶 6s。15 字≈3.2s,28 字≈4.7s。
+ */
+export function testimonyHold(text: string): number {
+  return Math.min(6000, 1600 + text.length * 110);
+}
+
 function humanOf(game: PublicGameState): PublicPlayer | undefined {
   return game.players.find((player) => player.isHuman);
 }
@@ -55,15 +63,21 @@ function describedInRound(game: PublicGameState, playerId: string, round: number
   return game.descriptions.some((item) => item.playerId === playerId && item.round === round);
 }
 
+/** 已在生成途中直播过的句子,放映只做快速回带(驱动状态机/揭示记账,不再全时长重放)。 */
+export const RECAP_HOLD = 600;
+
 /**
  * 把 `game.events[fromEventCount..]` 线性化为放映拍。
  * `startPhase` 为放映本段增量时机器所处相位(describe 后为 'testimony',vote 后为 'voting',
  * 旁观 continue 时为当前停泊相位)。系统事件只进公开记录、不进放映(其语义由横幅/行动坞覆盖)。
+ * `seen` 为已经由预告帧**实时直播过**的证词键(`round:playerId`):这些拍只停 RECAP_HOLD——
+ * 观众已经读过一遍,不再全时长重放(修复「等很久 + 跳得快」的双重不适)。
  */
 export function planBeats(
   game: PublicGameState,
   fromEventCount: number,
   startPhase: Phase,
+  seen?: ReadonlySet<string>,
 ): Beat[] {
   const human = humanOf(game);
   const humanId = human?.id ?? '';
@@ -126,9 +140,10 @@ export function planBeats(
     if (event.type === 'description') {
       inTestimony = true;
       const isHuman = event.playerId === humanId;
+      const recapped = !isHuman && seen?.has(`${event.round}:${event.playerId ?? ''}`);
       beats.push({
         id: event.id,
-        hold: isHuman ? HOLD.human : HOLD.testimony,
+        hold: recapped ? RECAP_HOLD : isHuman ? HOLD.human : testimonyHold(event.text),
         machine: { type: 'TESTIMONY_START', speakerId: event.playerId ?? '' },
         focusId: event.playerId ?? null,
         suspectId: null,

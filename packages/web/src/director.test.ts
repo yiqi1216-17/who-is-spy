@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planBeats, seatState, eliminatedRevealed, interactionMode } from './director.js';
+import { RECAP_HOLD, eliminatedRevealed, interactionMode, planBeats, seatState, testimonyHold } from './director.js';
 import type { GameEvent, PublicGameState, PublicPlayer } from './types.js';
 
 /** 五人基础盘:human 存活,四 AI。便于各用例改写 events/phase。 */
@@ -301,5 +301,48 @@ describe('导演 · 纯派生器', () => {
       players: baseGame().players.map((p) => (p.isHuman ? { ...p, alive: false } : p)),
     });
     expect(interactionMode(dead, { queueEmpty: true, online: true })).toBe('spectate');
+  });
+});
+
+describe('导演 · 停留自适应与直播回带(体验修复)', () => {
+  it('testimonyHold 随文本长度增长且有上下界', () => {
+    expect(testimonyHold('很短')).toBeGreaterThanOrEqual(1600);
+    expect(testimonyHold('这句话明显更长一些，需要更多的阅读时间才行')).toBeGreaterThan(
+      testimonyHold('短一点的句子'),
+    );
+    expect(testimonyHold('超长'.repeat(60))).toBe(6000); // 封顶
+  });
+
+  it('已直播过的证词只做快速回带;未直播的全时长;人类不受影响', () => {
+    const game = baseGame({
+      phase: 'voting',
+      events: [
+        desc('d-h', 'human', 1),
+        desc('d-1', 'ai-1', 1),
+        desc('d-2', 'ai-2', 1),
+      ],
+    });
+    const seen = new Set(['1:ai-1']); // 只有 ai-1 这句在生成途中被 SSE 直播过
+    const beats = planBeats(game, 0, 'testimony', seen);
+    const holdOf = (id: string) => beats.find((b) => b.id === id)!.hold;
+    expect(holdOf('d-1')).toBe(RECAP_HOLD); // 直播过 → 快速回带
+    expect(holdOf('d-2')).toBe(testimonyHold('ai-2 的描述')); // 未直播 → 全时长
+    expect(holdOf('d-h')).toBeGreaterThan(RECAP_HOLD); // 人类拍照旧
+    // 回带拍仍驱动状态机与揭示记账(权威管线不因直播绕过)。
+    expect(beats.find((b) => b.id === 'd-1')!.machine).toEqual({
+      type: 'TESTIMONY_START',
+      speakerId: 'ai-1',
+    });
+    expect(beats.find((b) => b.id === 'd-1')!.reveals).toBe('d-1');
+  });
+
+  it('不传 seen(投票/旁观段)行为与原先一致', () => {
+    const game = baseGame({
+      phase: 'voting',
+      events: [desc('d-1', 'ai-1', 1)],
+    });
+    expect(planBeats(game, 0, 'testimony').find((b) => b.id === 'd-1')!.hold).toBe(
+      testimonyHold('ai-1 的描述'),
+    );
   });
 });

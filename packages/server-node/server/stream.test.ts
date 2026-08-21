@@ -3,6 +3,7 @@ import {
   GameEventBus,
   STREAM_VERSION,
   formatEnd,
+  formatPreview,
   formatEnvelope,
   parseLastEventId,
   projectEnvelopes,
@@ -133,5 +134,52 @@ describe('GameEventBus · 订阅/广播/退订', () => {
     bus.subscribe('g1', (envs) => good.push(...envs.map((e) => e.seq)));
     expect(() => bus.publish('g1', projectEnvelopes('g1', LOG.slice(0, 1), -1))).not.toThrow();
     expect(good).toEqual([0]);
+  });
+});
+
+describe('预告帧 · 生成途中逐句直播(体验修复:异步发言感)', () => {
+  const frame = (playerId: string, text: string) =>
+    ({ v: STREAM_VERSION, gameId: 'g1', kind: 'description', round: 1, playerId, text }) as const;
+
+  it('formatPreview:preview 事件、不带 id 行(不参与 Last-Event-ID 补发)', () => {
+    const raw = formatPreview(frame('ai-1', '像放松时会看的东西'));
+    expect(raw.startsWith('event: preview\n')).toBe(true);
+    expect(raw).not.toContain('id:');
+    expect(raw.endsWith('\n\n')).toBe(true);
+    const data = JSON.parse(raw.split('data: ')[1]);
+    expect(data.kind).toBe('description');
+    expect(data.playerId).toBe('ai-1');
+  });
+
+  it('预告通道:订阅/广播/退订,按 gameId 隔离,与事件通道互不串扰', () => {
+    const bus = new GameEventBus();
+    const seen: string[] = [];
+    const eventSeen: number[] = [];
+    bus.subscribe('g1', (envs) => eventSeen.push(...envs.map((e) => e.seq)));
+    const off = bus.subscribePreview('g1', (f) => seen.push(f.playerId));
+    const other: string[] = [];
+    bus.subscribePreview('g2', (f) => other.push(f.playerId));
+
+    bus.publishPreview(frame('ai-1', '第一句'));
+    bus.publishPreview(frame('ai-2', '第二句'));
+    expect(seen).toEqual(['ai-1', 'ai-2']);
+    expect(other).toEqual([]); // gameId 隔离
+    expect(eventSeen).toEqual([]); // 预告不进事件通道
+
+    off();
+    bus.publishPreview(frame('ai-3', '第三句'));
+    expect(seen).toEqual(['ai-1', 'ai-2']); // 退订后不再收到
+  });
+
+  it('单个预告订阅者抛错被隔离;无订阅者广播不抛', () => {
+    const bus = new GameEventBus();
+    const good: string[] = [];
+    bus.subscribePreview('g1', () => {
+      throw new Error('broken');
+    });
+    bus.subscribePreview('g1', (f) => good.push(f.playerId));
+    expect(() => bus.publishPreview(frame('ai-1', '一句'))).not.toThrow();
+    expect(good).toEqual(['ai-1']);
+    expect(() => bus.publishPreview({ ...frame('ai-1', '一句'), gameId: 'nobody' })).not.toThrow();
   });
 });

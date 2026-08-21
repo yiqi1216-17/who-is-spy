@@ -146,3 +146,84 @@ describe('公开事件流 · HTTP SSE(有界终局流 + 续传)', () => {
     await request(app).get('/api/games/does-not-exist/stream').expect(404);
   });
 });
+
+describe('预告帧 · 引擎逐句直播(体验修复:异步发言感)', () => {
+  it('describe 命令期间:每条 AI 描述产出即广播预告帧,顺序与座次一致且先于命令返回', async () => {
+    const { engine } = createApp(new FakeGameModel());
+    const created = engine.createGame();
+
+    const previews: Array<{ playerId: string; text: string; atCommandDone: boolean }> = [];
+    let commandDone = false;
+    const off = engine.onPreviews(created.id, (frame) => {
+      previews.push({ playerId: frame.playerId, text: frame.text, atCommandDone: commandDone });
+    });
+    const next = await engine.submitHumanDescription(
+      created.id,
+      deterministicSafeHuman.describe(created, 1),
+    );
+    commandDone = true;
+    off();
+
+    // 四条 AI 预告,座次顺序,全部发生在命令返回**之前**(异步发言感的实质)。
+    expect(previews.map((p) => p.playerId)).toEqual(['ai-1', 'ai-2', 'ai-3', 'ai-4']);
+    expect(previews.every((p) => !p.atCommandDone)).toBe(true);
+    // 预告文本与最终权威描述逐条一致(过同一质量门,先播不改权威)。
+    for (const preview of previews) {
+      expect(
+        next.descriptions.some((d) => d.playerId === preview.playerId && d.text === preview.text),
+      ).toBe(true);
+    }
+    // 隐私:预告帧序列化后扫不出任何密词。
+    expect(scanSecrets(JSON.stringify(previews))).toEqual([]);
+  });
+
+  it('未知对局订阅预告 → 404 语义;退订后不再收到', async () => {
+    const { engine } = createApp(new FakeGameModel());
+    expect(() => engine.onPreviews('does-not-exist', () => {})).toThrow(/不存在|过期/);
+
+    const created = engine.createGame();
+    const seen: string[] = [];
+    const off = engine.onPreviews(created.id, (frame) => seen.push(frame.playerId));
+    off();
+    await engine.submitHumanDescription(created.id, deterministicSafeHuman.describe(created, 1));
+    expect(seen).toEqual([]);
+  });
+
+  it('SSE 端点:活跃流在生成期间下发 preview 帧(无 id 行),与事件帧并存', async () => {
+    const { app, engine } = createApp(new FakeGameModel());
+    const created = engine.createGame();
+
+    // 真实监听 + 流式读取:命令进行期间边生成边下发 preview 帧,命令后事件帧跟上。
+    const server = app.listen(0);
+    try {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      const response = await fetch(`http://127.0.0.1:${port}/api/games/${created.id}/stream`);
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const pump = (async () => {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+        }
+      })();
+
+      await engine.submitHumanDescription(created.id, deterministicSafeHuman.describe(created, 1));
+      // 给事件循环一拍冲刷分帧,然后收流。
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      await reader.cancel().catch(() => {});
+      await pump.catch(() => {});
+
+      const frames = buffer.split('\n\n').filter(Boolean);
+      const previewFrames = frames.filter((f) => f.startsWith('event: preview'));
+      expect(previewFrames.length).toBe(4); // 四条 AI 逐句直播
+      expect(previewFrames.every((f) => !f.includes('id:'))).toBe(true); // 不参与 Last-Event-ID
+      expect(frames.some((f) => f.startsWith('id: '))).toBe(true); // 权威事件帧并存
+      expect(scanSecrets(buffer)).toEqual([]);
+    } finally {
+      server.close();
+    }
+  });
+});

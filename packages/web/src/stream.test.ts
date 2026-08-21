@@ -130,3 +130,37 @@ describe('followGame · 跟播粘合层', () => {
     follower.close();
   });
 });
+
+describe('followGame · 预告帧(生成途中逐句直播)', () => {
+  const preview = (playerId: string, text: string, gameId = 'g1') =>
+    JSON.stringify({ v: 1, gameId, kind: 'description', round: 1, playerId, text });
+
+  it('preview 帧直通 onPreview,不进 onEvent、不影响 seq 去重', () => {
+    const source = new FakeSource();
+    const onEvent = vi.fn();
+    const onPreview = vi.fn();
+    followGame('g1', { onEvent, onPreview }, () => source);
+
+    source.emit('preview', preview('ai-1', '第一句'));
+    source.emit('event', JSON.stringify(ev('a', 0)));
+    source.emit('preview', preview('ai-2', '第二句'));
+    source.emit('event', JSON.stringify(ev('b', 1)));
+
+    expect(onPreview).toHaveBeenCalledTimes(2);
+    expect(onPreview.mock.calls.map((c) => c[0].playerId)).toEqual(['ai-1', 'ai-2']);
+    expect(onEvent).toHaveBeenCalledTimes(2); // 事件通道不受预告影响
+  });
+
+  it('异局/坏帧的 preview 被忽略;未提供 onPreview 时不抛', () => {
+    const source = new FakeSource();
+    const onPreview = vi.fn();
+    followGame('g1', { onEvent: vi.fn(), onPreview }, () => source);
+    source.emit('preview', preview('ai-1', '别局的句子', 'other-game'));
+    expect(() => source.emit('preview', '{bad json')).not.toThrow();
+    expect(onPreview).not.toHaveBeenCalled();
+
+    const bare = new FakeSource();
+    followGame('g1', { onEvent: vi.fn() }, () => bare);
+    expect(() => bare.emit('preview', preview('ai-1', '一句'))).not.toThrow();
+  });
+});

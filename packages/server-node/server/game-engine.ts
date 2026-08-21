@@ -31,7 +31,9 @@ import type { StrategyView } from './types.js';
 import {
   GameEventBus,
   projectEnvelopes,
+  STREAM_VERSION,
   type EnvelopeListener,
+  type PreviewListener,
   type StreamEnvelope,
 } from './stream.js';
 import { type HighlightReel, buildHighlights } from './highlights.js';
@@ -308,6 +310,12 @@ export class GameEngine {
   onGameEvents(id: string, listener: EnvelopeListener): () => void {
     this.requireGame(id);
     return this.bus.subscribe(id, listener);
+  }
+
+  /** 订阅某局生成途中的瞬态预告帧(逐句直播);与事件订阅同纪律,404 语义一致。 */
+  onPreviews(id: string, listener: PreviewListener): () => void {
+    this.requireGame(id);
+    return this.bus.subscribePreview(id, listener);
   }
 
   /**
@@ -626,6 +634,16 @@ export class GameEngine {
       const contextGame: GameState = { ...game, descriptions: visible };
       const text = await this.describeWithQualityGate(contextGame, agent, visible);
       produced.push({ playerId: agent.id, text, round: game.round });
+      // 异步发言感(体验修复):这句已过质量门,立即经预告通道直播给该局订阅者。
+      // 瞬态帧不入 events/不带 seq——命令若在后续失败原子回滚,权威对账(GET)自然不含它。
+      this.bus.publishPreview({
+        v: STREAM_VERSION,
+        gameId: game.id,
+        kind: 'description',
+        round: game.round,
+        playerId: agent.id,
+        text,
+      });
     }
     return produced;
   }

@@ -69,13 +69,35 @@ export function formatEnd(end: StreamEnd): string {
 }
 
 /**
+ * 生成途中的瞬态预告帧(体验修复:异步发言感):某席位刚说完一句、但整轮命令**尚未原子提交**。
+ * 与事件信封的三点刻意区别:**无 seq**(不入日志、不参与 Last-Event-ID 重连补发)、
+ * **不改变权威状态**(提交失败即作废,权威对账以 GET 为准)、**只承载本就会公开的字段**
+ * (playerId/round/text,且 text 已过质量门——结构上不含密词)。
+ */
+export interface PreviewFrame {
+  readonly v: typeof STREAM_VERSION;
+  readonly gameId: string;
+  readonly kind: 'description';
+  readonly round: number;
+  readonly playerId: string;
+  readonly text: string;
+}
+
+/** 纯函数:预告帧 → SSE 帧。刻意**不带 id 行**,浏览器 EventSource 不会把它记进 Last-Event-ID。 */
+export function formatPreview(frame: PreviewFrame): string {
+  return `event: preview\ndata: ${JSON.stringify(frame)}\n\n`;
+}
+
+/**
  * 每局公开事件总线(内存、进程内):命令在 `withGame` **原子提交后**向订阅者广播新信封。
  * 订阅者(SSE 连接)自行按 seq 去重/推进;取消订阅即从表中摘除,空集自动回收 —— 无长跑泄漏。
  */
 export type EnvelopeListener = (envelopes: StreamEnvelope[]) => void;
+export type PreviewListener = (frame: PreviewFrame) => void;
 
 export class GameEventBus {
   private readonly listeners = new Map<string, Set<EnvelopeListener>>();
+  private readonly previewListeners = new Map<string, Set<PreviewListener>>();
 
   /** 订阅某局的新信封广播,返回取消订阅句柄(幂等,可重复调用)。 */
   subscribe(gameId: string, listener: EnvelopeListener): () => void {
@@ -107,5 +129,31 @@ export class GameEventBus {
   /** 观测/测试用:某局当前订阅者数(无订阅者则 0)。 */
   subscriberCount(gameId: string): number {
     return this.listeners.get(gameId)?.size ?? 0;
+  }
+
+  /** 订阅某局的瞬态预告帧(生成途中逐句直播),返回取消订阅句柄。 */
+  subscribePreview(gameId: string, listener: PreviewListener): () => void {
+    const set = this.previewListeners.get(gameId) ?? new Set<PreviewListener>();
+    set.add(listener);
+    this.previewListeners.set(gameId, set);
+    return () => {
+      const current = this.previewListeners.get(gameId);
+      if (!current) return;
+      current.delete(listener);
+      if (current.size === 0) this.previewListeners.delete(gameId);
+    };
+  }
+
+  /** 广播一枚预告帧;单个订阅者异常被隔离(与 publish 同纪律)。 */
+  publishPreview(frame: PreviewFrame): void {
+    const set = this.previewListeners.get(frame.gameId);
+    if (!set) return;
+    for (const listener of [...set]) {
+      try {
+        listener(frame);
+      } catch {
+        // 慢/断开的连接抛错不应阻断其他订阅者或生成主流程。
+      }
+    }
   }
 }
