@@ -1,0 +1,30 @@
+# Render Blueprint:公网后端(常驻 Node 进程,承载内存态对局引擎 + SSE)
+# 用法:Render Dashboard → New → Blueprint → 选本仓库,或 https://render.com/deploy
+# 部署后把服务域名填进根目录 vercel.json 的 rewrites destination。
+services:
+  - type: web
+    name: who-is-spy-api
+    runtime: node
+    plan: free # 免费档演示够用;冷启动 ~30s,对局在内存中,实例休眠即丢(见 docs/DEPLOY.md)
+    rootDir: .
+    # 只装 server-node 一个 workspace(前端由 Vercel 构建,这里不需要)。
+    # --include=dev 必须显式:NODE_ENV=production 会让 npm 默认剔除 devDeps,而启动依赖 tsx(devDep)。
+    buildCommand: npm install --include=dev --workspace packages/server-node --include-workspace-root=false
+    startCommand: npm run start --workspace packages/server-node
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production # 生产闸:不挂 /api/ops/*、模型链无故障面、不静态托管前端
+      - key: PUBLIC_MODE
+        value: '1' # 公网守卫:每 IP 命令限频 + 每 IP/全局建局限额
+      - key: GAME_MODEL
+        value: real
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.deepseek.com
+      - key: DEEPSEEK_MODEL
+        value: deepseek-v4-flash
+      - key: DEEPSEEK_API_KEY
+        sync: false # 唯一需要手填的密钥:创建时 Render 会提示输入,绝不入库
+      # 可选:按余额调整三道闸(缺省 30 命令/分/IP · 6 局/时/IP · 150 局/天全局)
+      # - key: PUBLIC_MAX_GAMES_PER_DAY
+      #   value: '150'

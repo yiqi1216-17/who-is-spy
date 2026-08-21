@@ -16,6 +16,7 @@ import { DeepSeekClient, ModelError, type GameModel } from './model.js';
 import { MemoryTraceSink } from './obs/tracer.js';
 import { TracedModel } from './obs/traced-model.js';
 import { FaultSwitch, registerOpsRoutes } from './ops.js';
+import { createPublicGuard, guardOptionsFromEnv } from './public-guard.js';
 import {
   STREAM_VERSION,
   formatEnd,
@@ -49,6 +50,13 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
   // 知情、去标识的产品反馈存储(OpenSpec 05-H · 任务 5.5)。进程内、只出聚合、不出逐条。
   const feedback = new FeedbackStore();
   app.use(express.json({ limit: '16kb' }));
+
+  // 公网守卫(部署加固):仅 PUBLIC_MODE=1 挂载——每 IP 命令限频 + 每 IP/全局建局限额,
+  // 封顶模型成本与内存增长;不设 PUBLIC_MODE 时零行为差异(契约/本地路径逐字节不变)。
+  if (process.env.PUBLIC_MODE === '1') {
+    app.set('trust proxy', true); // Vercel rewrites → 后端的 XFF 链路取真实来源 IP
+    app.use(createPublicGuard(guardOptionsFromEnv(process.env)));
+  }
 
   app.get('/api/health', (_request, response) => {
     response.json({
