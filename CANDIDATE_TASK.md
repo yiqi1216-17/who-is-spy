@@ -185,3 +185,82 @@ npm run contract:go         # 语言无关契约应全绿
 对局,都不构成得分。与本任务书直接相关的重点是:Agent 独立决策与编排、AI 行为质量与
 游戏性、调试可观测性与故障恢复、评测与回归保护、Coding Agent 使用与人工验收、现场变体
 与架构迁移。
+
+---
+
+## 附录 A · 分模块测试命令速查(可直接复制到终端运行)
+
+> 下列命令**全部从仓库根目录执行**,每条自成一行、无需改参数,可整行复制或点击运行。
+> `--workspace` 形式**不切换当前目录**;`--` 之后的词是 vitest 的**文件名过滤器**,可任意组合。
+
+### 一键 · 先跑这个
+
+```bash
+npm run verify            # build + Node 域测试 + Node/Go 契约;全绿 = 基线硬门槛未被破坏
+```
+
+### 基线硬门槛 · 契约 + 全量域测试
+
+```bash
+npm run test:node         # server-node 全部域测试(vitest run)
+npm run contract:node     # 语言无关契约(FakeModel)· Node 后端
+npm run test:go           # server-go 全部测试(go test ./...)
+npm run contract:go       # 语言无关契约 · Go 后端
+```
+
+### 任务线① · Agent 决策与编排
+
+```bash
+# 上下文构造 / 编排 / 人设 / 信念(验证:同轮先发可见、四人设在同一局面可区分)
+npm test --workspace packages/server-node -- agent-context orchestration persona beliefs
+# 质量拦截:雷同或泄题描述被重试 / 降级,而不是直接推进对局
+npm test --workspace packages/server-node -- quality feedback
+# 权威裁决与投票信息隔离(不可破坏的硬门槛)
+npm test --workspace packages/server-node -- game-engine state-machine vote-authority voting-isolation
+```
+
+### 任务线② · 效果评测
+
+```bash
+# 指标 / 门禁 / 自对弈
+npm test --workspace packages/server-node -- eval
+# 语料归一化 + 确定性切分(可复现回归用例的基础)
+npm test --workspace packages/server-node -- corpus
+# 跑批量评测:N 局 → 指标表 →(越阈值)非 0 退出
+npm run eval:node
+# 数据准备(按需):导入语料 / 生成切分清单
+npm run data:import
+npm run data:splits
+```
+
+### 任务线③ · 可观测性与故障恢复
+
+```bash
+# trace / 重试 / 恢复 / 故障分类(定位到 哪一局-哪一轮-哪个 AI-第几次重试-什么错误)
+npm test --workspace packages/server-node -- obs
+# 关键决策回放
+npm test --workspace packages/server-node -- replay
+# 隐私哨兵:日志 / 回放不含明文 Key 或完整密词
+npm test --workspace packages/server-node -- theater-privacy sentinel-sweep
+```
+
+### 前端 · 可选加分层
+
+```bash
+npm test --workspace packages/web                                      # 全部前端单测
+npm test --workspace packages/web -- director highlights presentation  # 指定模块
+```
+
+### 真实模型冒烟 · 需 `.env` 配好 DeepSeek / OpenAI-compatible Key
+
+```bash
+npm test --workspace packages/server-node -- smoke   # 打真实模型的冒烟测试(无 Key 会跳过/失败)
+```
+
+### 提示 · 单文件 / 监视 / 等价写法
+
+```bash
+npm test --workspace packages/server-node -- agent-context.test.ts     # 只跑一个文件
+npm run test:watch --workspace packages/server-node -- agent-context   # 监视模式,边改边测
+cd packages/server-node && npx vitest run agent-context                # 等价的包内写法(会切换目录)
+```
