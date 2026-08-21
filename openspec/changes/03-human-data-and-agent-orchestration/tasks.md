@@ -20,7 +20,7 @@
 
 - [x] 2.1 Write producer/consumer compatibility tests, then add versioned schemas for public state, events, Agent context, beliefs, strategies, model outputs, dataset records, hooks, traces, and reports.
 - [x] 2.2 Write legal/illegal transition-table tests, then route Node phases and actions through an explicit domain state machine without changing the public HTTP contract.
-- [ ] 2.3 Add migration fixtures proving incompatible persisted datasets, traces, replay envelopes, and reports fail with actionable version errors. — **延后→04-G**(与版本化信封收口同批做;A3 迁移守卫)
+- [x] 2.3 Add migration fixtures proving incompatible persisted datasets, traces, replay envelopes, and reports fail with actionable version errors. — `migration-guard.test.ts`(11 例):以「未来版本 v+1」「过期 v0」两种真实工件 fixture,逐类证明 datasetRecord/traceEvent/report/event 经 `parseVersioned` 抛 `SchemaVersionError`(消息含 kind 名 + 期望/实际版本,可执行);kind 张冠李戴与裸工件(无信封)亦被拒;回放日志经 `validateReplayLog` 归 `schema_version` 关并含期望版本。A3 迁移守卫由此在**消费入口**收口。
 
 ## 3. Build the human-game data foundation — 延后(范围决定:不引入数据治理开销)
 
@@ -40,8 +40,8 @@
 > 反转 CH-2:策略不再硬编码,可只换数据不动代码。**延后**的是把 `synthetic` 手写种子替换为真实语料**抽取的分布**,
 > 及其形式化溯源/检索资格/校准消融测试(4.2–4.4 的治理化部分)。架构已就绪,替换是纯数据变更。
 
-- [ ] 4.1 Record B0 behavior distributions, then extract reproducible speech tactics, social acts, specificity, novelty, and outcomes from eligible training records.
-- [ ] 4.2 Add strategy-provenance tests, then generate versioned interpretable prototypes with representative sample IDs and measured distributions.
+- [x] 4.1 Record B0 behavior distributions, then extract reproducible speech tactics, social acts, specificity, novelty, and outcomes from eligible training records. — `tools/extract-strategies.ts` 从 werewolf-among-us **train split**(109 局/475 玩家,泄漏隔离后)句级说服策略标注抽取:玩家级主导标签分桶 → 四簇实测分布(Interrogation/Accusation/Defense/Evidence/…),specificity/novelty/risk 由簇内标签占比派生;`data:strategies` 可复现重算,分布证据 `data/normalized/strategy-extraction-report.json`。
+- [x] 4.2 Add strategy-provenance tests, then generate versioned interpretable prototypes with representative sample IDs and measured distributions. — `strategies.data.ts`(生成物)四份 `provenance:{kind:'transfer', sampleIds ⊆ train}` 原型;`persona.test.ts` 断言 provenance 为 transfer + sampleIds 非空且全部 `^werewolf-among-us:`(结构性可追溯,永不谎称 human)。**诚实边界**:transfer(跨游戏人类证据)非直接 human 卧底语料,4.3/4.4 的检索资格/校准消融属基准治理仍延后(见 §4 抬头 + `data/README.md`)。
 - [ ] 4.3 Add retrieval eligibility and frozen-split denial tests, then retrieve masked demonstrations by role, phase, public situation, and strategy.
 - [ ] 4.4 Add calibration and ablation fixtures, then rank schema-valid candidates using weights fitted only on training/validation data.
 
