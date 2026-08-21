@@ -257,3 +257,18 @@
 - 全局门禁本轮复核(2026-08-21 openspec/changes 收尾):`npm run build` EXIT 0(web + server 双 tsc)·
   `npm run test:node` **304 通过 / 1 跳过(42 文件;跳过=无密钥的 DeepSeek 真机 smoke)** ·
   `npm run contract:node` **28 通过 / 0 失败** · `npx openspec validate 03 --strict` / `04 --strict` 均 valid。
+- 阵营胜率军备竞赛(04 §7,题面②真正问的问题——2026-08-21):`compare` 钉的是**描述质量**(答「人设有没有
+  差异化」);本线钉的是**胜负**——「学到更强策略后,**平民/卧底哪一方更容易赢**」。数据依据先行:`npm run
+  data:outcomes`(`corpus/mine-outcomes.ts`)从 raw werewolf 的 `votingOutcome`/`endRoles`(extract-strategies
+  丢弃的那一半)挖出——村民类比方经验胜率 **58.8%**、四说服话风簇获胜占比 **48%–57%**,证实「阵营与话风都对胜负
+  有可测影响」(`data/normalized/outcome-correlation-report.json`,只统计 train split)。据此标定四档技能,经 §5.3 同一
+  **`resolveStrategy` 注入缝**让**投票由技能驱动**(平民按公开描述离群度锁卧底=civSkill、卧底 spyBlend 融入簇 +
+  spyDeflect 转移火力)——**只读 `publicDescriptions`+ 自身身份,终局前隔离不变量原样保持,零契约变更(contract 仍
+  28/0)**。`npm run arms-race:node` 实测(seed=7,80 局):平民胜率 **65%→83.8%→62.5%→80%**,三步摆动
+  **civ↑→spy↑→civ↑ 全部成立、100% 完局**;摆动不成立即 CLI **exit 1**。证据 `docs/evidence/04-arms-race.md`(+`.jsonl`,
+  落盘前 `scanSecrets` 双保险)。验收 `eval/arms-race.test.ts`(7,含因果性:仅换 civSkill/spyBlend 胜率显著改变)+
+  `corpus/mine-outcomes.test.ts`(9)。**诚实边界**:胜率摆动是**仿真**「离群度→投票」耦合的产物、非人类逐局回放;
+  werewolf(ONUW)≠谁是卧底,是跨游戏迁移信号;三段摆动是**为演示军备竞赛动态而设计**的确定性机制。
+- 全局门禁再复核(2026-08-21 军备竞赛线):`npm run build` EXIT 0 · `npm run test:node` **326 通过(45 文件;
+  本机含 DeepSeek 真机 smoke,无密钥时该 1 例跳过)** · `npm run contract:node` **28 通过 / 0 失败** ·
+  `npx openspec validate 04 --strict` valid。
