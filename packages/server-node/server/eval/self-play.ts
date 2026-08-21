@@ -1,7 +1,7 @@
 import { GameEngine, GameRuleError } from '../game-engine.js';
 import type { GameModel } from '../model.js';
 import type { Belief } from '../schema.js';
-import type { AgentContext, GameReview, GameState, PublicGameState, VoteTarget } from '../types.js';
+import type { AgentContext, GameReview, GameState, Player, PublicGameState, StrategyView, VoteTarget } from '../types.js';
 
 /**
  * 无头自博弈 harness(OpenSpec 04 · Task 1.2 / 1.3 · MED「无 headless 全 AI 入口」)
@@ -190,6 +190,8 @@ export interface SelfPlayBatchOptions {
   games: number;
   seed: number;
   policy?: HumanSeatPolicy;
+  /** 策略解析器(消融/对比注入)。默认 undefined → 引擎用模块级 `strategyForAgent`,行为不变。 */
+  resolveStrategy?: (agent: Player) => StrategyView;
 }
 
 /**
@@ -201,7 +203,7 @@ export async function runSelfPlayBatch(
   options: SelfPlayBatchOptions,
 ): Promise<SelfPlayResult[]> {
   const counting = new CountingModel(model);
-  const engine = new GameEngine(counting, mulberry32(options.seed));
+  const engine = new GameEngine(counting, mulberry32(options.seed), undefined, options.resolveStrategy);
   const policy = options.policy ?? deterministicSafeHuman;
   const results: SelfPlayResult[] = [];
   for (let i = 0; i < options.games; i += 1) {

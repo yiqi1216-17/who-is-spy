@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "eval": "tsx server/tools/evaluate.ts",
+    "compare": "tsx server/tools/compare-eval.ts",
     "data:import": "tsx server/tools/import-corpus.ts",
     "data:splits": "tsx server/tools/build-splits.ts",
     "data:strategies": "tsx server/tools/extract-strategies.ts"

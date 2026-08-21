@@ -27,6 +27,7 @@ import type {
 } from './types.js';
 import { chooseWordPair } from './words.js';
 import { strategyForAgent } from './strategies.js';
+import type { StrategyView } from './types.js';
 import {
   GameEventBus,
   projectEnvelopes,
@@ -110,6 +111,12 @@ export class GameEngine {
     private readonly model: GameModel,
     private readonly random: () => number = Math.random,
     private readonly obs?: EngineObservability,
+    /**
+     * 策略解析器(评测/消融注入点)。默认 = 模块级 `strategyForAgent`(按座次取种子策略),
+     * 因此**生产与契约路径行为逐字节不变**。评测线注入不同策略配置(v1/v2/collapsed)即可在
+     * 同一 seed 下对比「策略差异化」对指标的因果影响,而不触碰编排/裁决/隔离任何一行。
+     */
+    private readonly resolveStrategy: (agent: Player) => StrategyView = strategyForAgent,
   ) {}
 
   /** 下一个 correlationId:优先用注入工厂,否则实例内单调 `eng-N`(确定性)。 */
@@ -597,7 +604,7 @@ export class GameEngine {
         alive: player.alive,
         role: player.role,
         word: player.word,
-        strategy: strategyForAgent(player),
+        strategy: this.resolveStrategy(player),
       })),
       descriptions: game.descriptions,
       votes: game.votes,
@@ -659,7 +666,7 @@ export class GameEngine {
     let lastCode: QualityCode = 'too_short';
     for (let attempt = 1; attempt <= MAX_DESCRIBE_ATTEMPTS; attempt += 1) {
       const started = this.obs?.now?.();
-      const context = buildAgentContext(contextGame, agent);
+      const context = buildAgentContext(contextGame, agent, this.resolveStrategy(agent));
       // 上帝模式取回 {text, thought};人类局仍走原 describe(thought 恒为空),行为不变。
       const { text, thought } =
         wantThought && this.model.describeWithThought
@@ -701,7 +708,10 @@ export class GameEngine {
           isHuman,
           alive,
         }));
-        const result = await this.model.vote(buildAgentContext(game, voter), allowedView);
+        const result = await this.model.vote(
+          buildAgentContext(game, voter, this.resolveStrategy(voter)),
+          allowedView,
+        );
         // 授权:目标合法性由确定性代码裁决,不信任模型返回值——越界/已出局/自投一律
         // 回落到确定性首选合法目标,杜绝 resolveBallot 误淘汰已出局者的状态腐坏。
         const targetId = allowed.some((p) => p.id === result.targetId)
