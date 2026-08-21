@@ -1,0 +1,34 @@
+{
+  "generatedBy": "server/tools/import-corpus.ts",
+  "schemaTarget": "datasetRecord v1",
+  "sources": [
+    {
+      "source": "ck-arena",
+      "status": "imported",
+      "imported": 707,
+      "diagnostics": [],
+      "outFile": "data/normalized/ck-arena.jsonl"
+    },
+    {
+      "source": "werewolf-among-us",
+      "status": "imported",
+      "imported": 151,
+      "diagnostics": [],
+      "outFile": "data/normalized/werewolf-among-us.jsonl"
+    },
+    {
+      "source": "ctwei-spy",
+      "status": "rejected",
+      "imported": 0,
+      "diagnostics": [],
+      "reason": "unknown-rights:上游仓库无 LICENSE(默认保留所有权利),按 spec「Record with unknown rights is rejected」隔离于 raw/,不入库、不再分发"
+    },
+    {
+      "source": "spygame",
+      "status": "rejected",
+      "imported": 0,
+      "diagnostics": [],
+      "reason": "no-game-records:GPL-3.0 方法论来源(消偏/ToM 设计输入),不产生对局记录"
+    }
+  ]
+}

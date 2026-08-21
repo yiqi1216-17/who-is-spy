@@ -23,7 +23,10 @@
     "contract:node": "node contract/run.mjs node",
     "contract:go": "node contract/run.mjs go",
     "eval:node": "cd packages/server-node && npx tsx server/tools/evaluate.ts",
-    "verify": "npm run build && npm run test:node && npm run contract:node && npm run contract:go"
+    "verify": "npm run build && npm run test:node && npm run contract:node && npm run contract:go",
+    "data:import": "cd packages/server-node && npx tsx server/tools/import-corpus.ts",
+    "data:splits": "cd packages/server-node && npx tsx server/tools/build-splits.ts",
+    "data:strategies": "cd packages/server-node && npx tsx server/tools/extract-strategies.ts"
   },
   "license": "MIT"
 }

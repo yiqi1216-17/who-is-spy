@@ -9,7 +9,10 @@
     "build": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "eval": "tsx server/tools/evaluate.ts"
+    "eval": "tsx server/tools/evaluate.ts",
+    "data:import": "tsx server/tools/import-corpus.ts",
+    "data:splits": "tsx server/tools/build-splits.ts",
+    "data:strategies": "tsx server/tools/extract-strategies.ts"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

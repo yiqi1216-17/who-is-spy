@@ -1,0 +1,138 @@
+# 数据来源 manifest —— spec「Every dataset record has verifiable provenance」的最小实现。
+# 每个来源:出处 / 资产 / 许可 / 获取方式 / 允许与禁止用途 / 映射到 schema.ts datasetRecord
+# 的 provenance 值。修改本文件即视为 manifest 版本变更,须提升 manifestVersion 并在
+# DECISIONS.md 记一条。
+manifestVersion: 1
+updated: "2026-08-19"
+schemaTarget: packages/server-node/server/schema.ts#datasetRecordSchema
+
+sources:
+  - id: werewolf-among-us
+    paper:
+      arxiv: "2212.08279"
+      title: "Werewolf Among Us: Multimodal Resources for Modeling Persuasion Behaviors in Social Deduction Games"
+      venue: "Findings of ACL 2023"
+    assets:
+      - kind: dataset
+        url: "https://huggingface.co/datasets/bolinlai/Werewolf-Among-Us"
+        note: "权威入口(旧官网 persuasion-deductiongame.socialai-data.org 已失效);595 个文件,含 Ego4D/Youtube 两子集的转录、句级说服策略标注、split"
+      - kind: code
+        url: "https://github.com/SALT-NLP/PersuationGames"
+        note: "基线代码,仓库无 LICENSE 文件——只读方法,不拷贝"
+      - kind: project-page
+        url: "https://bolinlai.github.io/projects/Werewolf-Among-Us/"
+    language: en
+    games: ["One Night Ultimate Werewolf", "Avalon"]
+    size:
+      games: 199
+      utteranceAnnotations: 26647
+      strategyClasses: 6
+    license:
+      dataset: Apache-2.0        # HF dataset card 标注;文本转录+标注适用
+      caveat: "Ego4D 子集的底层视频受 Ego4D License 约束,需单独签署;仅使用文本与标注则不涉及"
+    humanData: true              # 唯一真实人类对局来源
+    provenanceKind: transfer     # 非谁是卧底 → 永不标 human(design.md 决策 3)
+    permittedUses:
+      - 说服策略分类学 → tactics 词表与策略原型维度(tasks 4.1/4.2)
+      - specificity/novelty 分布统计(transfer,带 sampleIds)
+      - change 04 评测指标设计参考
+    blockedUses:
+      - 冒充直接人类谁是卧底证据
+      - 使用视频/多模态部分(未签 Ego4D License 前)
+    acquisition: "bash data/scripts/fetch.sh werewolf-among-us   # 文本白名单(*.json/*.txt/*.csv/*.md),显式排除 videos/(实测 --exclude '*.zip' 挡不住 mp4)"
+    risks:
+      - 语言差(en→zh)与游戏差(狼人杀→谁是卧底)带来的分布迁移假设需在 DECISIONS.md 显式记录
+
+  - id: spygame
+    paper:
+      arxiv: "2310.20499"
+      title: "Leveraging Word Guessing Games to Assess the Intelligence of Large Language Models (DEEP + SpyGame)"
+      org: "Tsinghua SIGS / Tencent AI Lab"
+    assets:
+      - kind: code+data
+        url: "https://github.com/Skytliang/SpyGame"
+        note: "prompt/keyword_set.json = 50 个词对(英文表述,含中式概念对);DEEP 部分 40 个中英目标词"
+    language: zh/en
+    size:
+      keywordPairs: 50
+      deepTargetWords: 40
+    license:
+      repo: GPL-3.0
+    humanData: false
+    provenanceKind: null         # 不产生对局记录;仅方法论与词对参考
+    permittedUses:
+      - 阅读并自行实现:名字/座位顺序/选项顺序三类消偏(→ change 04 批量评测设计)
+      - 阅读并自行实现:一阶/二阶 ToM 探针
+      - 词对主题参考(自行撰写中文对,不逐条拷贝)
+    blockedUses:
+      - 任何代码拷贝进本仓库(GPL-3.0 传染;本仓库无 LICENSE)
+    acquisition: "git clone --depth 1 https://github.com/Skytliang/SpyGame data/raw/spygame"
+    risks:
+      - 词对以英文 JSON 存储,词面直译需人工复核中文语感
+
+  - id: ctwei-spy
+    paper:
+      arxiv: "2503.15235"
+      title: "Exploring Large Language Models for Word Games: Who is the Spy?"
+    assets:
+      - kind: code+data
+        url: "https://github.com/ct-wei/Who-is-The-Spy"
+        branch: cot              # 默认分支是 cot,不是 main
+        note: "data/4player.csv(4 玩家词+卧底座位)、data/4players-simple.csv(+类别列);中文;行数以抓取后为准。result/ 为 GLM 批量对局日志"
+    language: zh
+    size:
+      wordlists: 2
+      wordlistRows: 171          # 4player.csv=100 行 + 4players-simple.csv=71 行(2026-08-19 抓取实测)
+    license:
+      repo: NONE                 # 无 LICENSE 文件 = 默认保留所有权利
+    humanData: false
+    provenanceKind: synthetic    # 对局日志为 GLM 生成;词表 unknown-rights
+    quarantine: true             # spec「Record with unknown rights is rejected」
+    permittedUses:
+      - 本地对照实验(格式与本项目 1 human + 4 AI 座次最贴近)
+      - 词表结构参考(4 词 + 卧底座位 + 类别)——自建中文词对时借鉴格式
+    blockedUses:
+      - 入库 normalized/、再分发、进 Git
+      - 作为训练/策略抽取语料
+    acquisition: "git clone --depth 1 --branch cot https://github.com/ct-wei/Who-is-The-Spy data/raw/ctwei-spy"
+    risks:
+      - 无许可 → importer 必须直接拒绝并留 diagnostic(tasks 3.2)
+
+  - id: ck-arena
+    paper:
+      arxiv: "2505.17512"
+      title: "Is Your LLM Really Mastering the Concept? A Multi-Agent Benchmark (CK-Arena)"
+      org: "BNU 等"
+    assets:
+      - kind: dataset
+        url: "https://huggingface.co/datasets/Xushuhaha/CK-Arena"
+        note: "628 英文词对,按词性(形/副/动/名)与 13+ 语义类组织;Kaggle 有镜像 shuhangxu68/ck-arena"
+      - kind: code+logs
+        url: "https://github.com/Yeswolo/CK-Arena"
+        note: "logs/ 下 746 个 LLM 对局日志(en/raw);data/train|test.jsonl 为自动构造 QA;LLM-judge + ELO 打分;main_human.py 支持人类参与但公开日志均为 LLM 局"
+      - kind: homepage
+        url: "https://ck-arena.site"
+    language: en(主),宣称 10 语言
+    size:
+      wordPairs: 628             # README 口径;HF 实际布局为 word_list_1/en_529/(529+tested 子集,2026-08-19 抓取实测)
+      gameLogs: 707              # logs/ 下 .json 实测数(GitHub tree 统计 746 含目录条目)
+    license:
+      dataset: Apache-2.0        # HF dataset card 标注
+    humanData: false
+    provenanceKind: synthetic    # 对局日志全为 LLM 生成 → 绝不标 human
+    permittedUses:
+      - 词对翻译/筛选后扩充 words.ts WORD_PAIRS(Apache-2.0,可安全入库,需注明出处)
+      - synthetic 对局日志 → 泄题/同质化指标校准集与回归 fixture(→ change 04)
+      - LLM-judge + ELO 方法论 → change 04 评测设计
+    blockedUses:
+      - 把 LLM 对局日志计入 human/transfer 证据
+    acquisition: |
+      git clone --depth 1 https://github.com/Yeswolo/CK-Arena data/raw/ck-arena
+      HF_ENDPOINT=https://hf-mirror.com hf download Xushuhaha/CK-Arena --repo-type dataset --local-dir data/raw/ck-arena-hf
+    risks:
+      - 英文词对的"相近但可区分"张力在翻译后可能失效,入库前逐对人工复核
+
+# —— 缺口声明(诚实计数,对齐 spec「Baseline report counts human evidence」)——
+gap:
+  directHumanWhoIsTheSpy: 0     # 四个来源合计为零;human 证据只能一方自采(tasks 3.4)
+  statement: "在自采语料落地前,任何对外表述不得出现 learned from human play"

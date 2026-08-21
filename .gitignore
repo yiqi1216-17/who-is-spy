@@ -12,6 +12,12 @@ packages/server-go/server-go
 packages/server-go/*.test
 packages/server-go/.gocache/
 
+# data corpus — raw/restricted records stay outside Git (see data/README.md §4)
+data/raw/*
+!data/raw/.gitkeep
+# normalized corpus is reproducible via fetch.sh + data:import; only the report is tracked
+data/normalized/*.jsonl
+
 # interview artifacts
 traces/
 *.replay.json
