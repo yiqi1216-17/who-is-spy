@@ -34,6 +34,8 @@ export interface StageProps {
   suspectId: string | null;
   banner: string | null;
   thinking: boolean;
+  /** 命令请求在途(真实模型一轮 30–90s):行动坞必须给出等待反馈并防连点。 */
+  busy: boolean;
   mode: Interaction;
   description: string;
   selectedTarget: string;
@@ -190,7 +192,7 @@ function Spotlightlet({
         <p className={`spotlight-quote ${spotlight.muted ? 'muted' : ''}`}>{spotlight.text}</p>
       ) : (
         <p className="spotlight-quote muted">
-          {thinking ? '玩家正在斟酌…' : mode === 'describe' ? '组织一句不露密词的描述。' : '牌局静默片刻。'}
+          {thinking ? 'AI 玩家正在酝酿说辞…' : mode === 'describe' ? '组织一句不露密词的描述。' : '牌局静默片刻。'}
           {thinking && (
             <span className="thinking" aria-hidden="true">
               <i />
@@ -208,6 +210,20 @@ function Dock(props: StageProps) {
   const { mode, game } = props;
 
   if (mode === 'describe') {
+    // 已提交:真实模型下四位 AI 依次发言约需一分钟——收起输入、明示进度,杜绝「点了没反应」与连点重发。
+    if (props.busy) {
+      return (
+        <div className="dock">
+          <div className="dock-spectator" aria-live="polite">
+            <LoaderCircle className="spin" size={20} />
+            <div>
+              <strong>描述已提交</strong>
+              <small>四位 AI 正在依次组织发言，约需一分钟，请稍候…</small>
+            </div>
+          </div>
+        </div>
+      );
+    }
     const length = props.description.trim().length;
     return (
       <div className="dock">
@@ -253,9 +269,13 @@ function Dock(props: StageProps) {
             <span>{chosen ? `已选择：${chosen.name}` : '点选上方立绘，再确认投票'}</span>
           </div>
         </div>
-        <button className="btn btn-rust btn-block" onClick={props.onVote} disabled={!props.selectedTarget}>
-          <Target size={17} />
-          确认投给 {chosen?.name ?? '…'}
+        <button
+          className="btn btn-rust btn-block"
+          onClick={props.onVote}
+          disabled={!props.selectedTarget || props.busy}
+        >
+          {props.busy ? <LoaderCircle className="spin" size={17} /> : <Target size={17} />}
+          {props.busy ? '计票中，稍候…' : `确认投给 ${chosen?.name ?? '…'}`}
         </button>
         {props.error && <ErrorLine message={props.error} />}
       </div>
@@ -272,9 +292,9 @@ function Dock(props: StageProps) {
             <small>以旁观视角推进 AI 的后续对局</small>
           </div>
         </div>
-        <button className="btn btn-ink btn-block" onClick={props.onContinue}>
-          <ArrowRight size={17} />
-          推进牌局
+        <button className="btn btn-ink btn-block" onClick={props.onContinue} disabled={props.busy}>
+          {props.busy ? <LoaderCircle className="spin" size={17} /> : <ArrowRight size={17} />}
+          {props.busy ? 'AI 对局推进中，约需一分钟…' : '推进牌局'}
         </button>
         {props.error && <ErrorLine message={props.error} />}
       </div>

@@ -188,7 +188,7 @@ export function App() {
   }, [homeMode, startGod, handleFailure]);
 
   const onDescribe = useCallback(async () => {
-    if (!game) return;
+    if (!game || busy) return; // busy 防重入:真实模型一轮 30–90s,连点会重复提交
     const text = description.trim();
     if (text.length < 2) return;
     const from = game.events.length;
@@ -205,10 +205,10 @@ export function App() {
     } finally {
       setBusy(false);
     }
-  }, [game, description, handleFailure, startSegment]);
+  }, [game, busy, description, handleFailure, startSegment]);
 
   const onVote = useCallback(async () => {
-    if (!game || !selectedTarget) return;
+    if (!game || !selectedTarget || busy) return;
     const from = game.events.length;
     const wasHumanAction = pres.phase === 'human-action';
     setBusy(true);
@@ -224,10 +224,10 @@ export function App() {
     } finally {
       setBusy(false);
     }
-  }, [game, selectedTarget, pres.phase, handleFailure, startSegment]);
+  }, [game, busy, selectedTarget, pres.phase, handleFailure, startSegment]);
 
   const onContinue = useCallback(async () => {
-    if (!game) return;
+    if (!game || busy) return;
     const from = game.events.length;
     setBusy(true);
     setError('');
@@ -240,7 +240,7 @@ export function App() {
     } finally {
       setBusy(false);
     }
-  }, [game, pres.phase, handleFailure, startSegment]);
+  }, [game, busy, pres.phase, handleFailure, startSegment]);
 
   const onRetry = useCallback(async () => {
     dispatch({ type: 'NET_RETRYING' });
@@ -295,6 +295,7 @@ export function App() {
         suspectId={view.suspectId}
         banner={view.banner}
         thinking={busy}
+        busy={busy}
         mode={mode}
         description={description}
         selectedTarget={selectedTarget}
