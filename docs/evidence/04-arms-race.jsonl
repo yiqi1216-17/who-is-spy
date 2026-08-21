@@ -1,0 +1,8 @@
+{"kind":"iteration","seed":7,"games":80,"skill":"baseline","civilianWinRate":0.65,"undercoverWinRate":0.35,"completionRate":1}
+{"kind":"iteration","seed":7,"games":80,"skill":"civ-awake","civilianWinRate":0.8375,"undercoverWinRate":0.1625,"completionRate":1}
+{"kind":"iteration","seed":7,"games":80,"skill":"spy-counter","civilianWinRate":0.625,"undercoverWinRate":0.375,"completionRate":1}
+{"kind":"iteration","seed":7,"games":80,"skill":"civ-refined","civilianWinRate":0.8,"undercoverWinRate":0.2,"completionRate":1}
+{"kind":"step","from":"baseline","to":"civ-awake","civilianDelta":0.1875,"undercoverDelta":-0.1875,"expected":"civilian","actual":"civilian","swungAsExpected":true}
+{"kind":"step","from":"civ-awake","to":"spy-counter","civilianDelta":-0.2125,"undercoverDelta":0.2125,"expected":"undercover","actual":"undercover","swungAsExpected":true}
+{"kind":"step","from":"spy-counter","to":"civ-refined","civilianDelta":0.175,"undercoverDelta":-0.175,"expected":"civilian","actual":"civilian","swungAsExpected":true}
+{"kind":"verdict","armsRaceHolds":true}

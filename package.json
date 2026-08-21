@@ -24,10 +24,12 @@
     "contract:go": "node contract/run.mjs go",
     "eval:node": "cd packages/server-node && npx tsx server/tools/evaluate.ts",
     "compare:node": "cd packages/server-node && npx tsx server/tools/compare-eval.ts",
+    "arms-race:node": "cd packages/server-node && npx tsx server/tools/arms-race.ts",
     "verify": "npm run build && npm run test:node && npm run contract:node && npm run contract:go",
     "data:import": "cd packages/server-node && npx tsx server/tools/import-corpus.ts",
     "data:splits": "cd packages/server-node && npx tsx server/tools/build-splits.ts",
-    "data:strategies": "cd packages/server-node && npx tsx server/tools/extract-strategies.ts"
+    "data:strategies": "cd packages/server-node && npx tsx server/tools/extract-strategies.ts",
+    "data:outcomes": "cd packages/server-node && npx tsx server/tools/mine-outcomes.ts"
   },
   "license": "MIT"
 }
