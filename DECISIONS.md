@@ -237,3 +237,23 @@
   证据 `docs/evidence/05-4-scene-driver.md`;`openspec validate 05 --strict` ✓。
 - 全局门禁末次复核(2026-08-19 交付收口):`npm run build` EXIT 0(web + server 双 tsc)·
   `npm run test:node` **280 通过 / 0 跳过(39 文件)** · `npm run contract:node` **28 通过 / 0 失败**。
+- 语料地基线(03 §3/§4,2026-08-21):四来源权利定性(werewolf-among-us=可迁移 / spygame=仅方法 GPL /
+  ctwei-spy=无许可隔离 / ck-arena=合成 Apache)→ `data/normalize.ts` 严格信封 `datasetRecord` → `data/splits.ts`
+  按组(词对 / 视频 cohort)FNV-1a 播种泄漏隔离 70/10/10/10 → `data/extract-strategies.ts` 产出带 transfer 溯源的
+  `TRANSFER_STRATEGIES` v2,**只换数据不动编排代码**(种子策略 synthetic→transfer 为纯数据变更)。脚本
+  `npm run data:import / data:splits / data:strategies`。
+- 迭代对比评测(04 §5.3 champion/challenger · §6.1 消融,题面②「看到提升 diff、劣化被拦」):
+  `npm run compare:node` 在**同 seed、同随机流、同人类陪跑、唯一变量=策略集**下,跑三配置 `collapsed →
+  synthetic-v1 → transfer-v2` 并产出逐步 metric diff + 回归预算门。经 `resolveStrategy` 注入缝把策略解析注入引擎
+  (**零契约变更**,`contract:node` 仍 28/0),`StrategyDrivenModel` 按 persona 取词——可区分则描述低相似(过 0.72
+  质量门),坍缩则雷同(撞门→重试→穷尽→整回合原子终止)。实测:坍缩(完局 0 / 可区分 0,门禁 ❌3)→ v1
+  (完局 1 / 可区分 1 ✅)是明确提升;v1→v2(完局 1 / 可区分 1,漂移 0)是纯数据等价。回归预算门双向验证:
+  好→坏 `regressed=true` → **CLI exit 1**、坏→好不触发(完局率零容忍)。证据 `docs/evidence/04-strategy-compare.md`
+  (自动生成分析报告)+ 同名 `.jsonl`(逐配置逐指标脱敏日志,落盘前 `scanSecrets` 双保险)。验收 `eval/compare.test.ts`(8)。
+- 持久化工件迁移守卫(03 §2.3):`migration-guard.test.ts`(11)对四类落盘工件
+  (`datasetRecord/traceEvent/report/event`)钉未来版本(v+1)/过期版本(v0)→ `parseVersioned` 抛 `SchemaVersionError`
+  (含 kind + `v${SCHEMA_VERSION}` + 实际版本)、kind 错标、裸工件(无信封);回放日志 FUTURE 版本 → `validateReplayLog`
+  抛 code `schema_version`。
+- 全局门禁本轮复核(2026-08-21 openspec/changes 收尾):`npm run build` EXIT 0(web + server 双 tsc)·
+  `npm run test:node` **304 通过 / 1 跳过(42 文件;跳过=无密钥的 DeepSeek 真机 smoke)** ·
+  `npm run contract:node` **28 通过 / 0 失败** · `npx openspec validate 03 --strict` / `04 --strict` 均 valid。
