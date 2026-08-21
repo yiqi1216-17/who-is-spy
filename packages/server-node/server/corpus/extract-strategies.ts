@@ -47,7 +47,7 @@ export const TAG_TACTIC: Record<PersuasionTag, string> = {
 };
 
 /** 主导标签 → 簇。 */
-const CLUSTER_OF: Record<PersuasionTag, ClusterId> = {
+export const CLUSTER_OF: Record<PersuasionTag, ClusterId> = {
   Interrogation: 'interrogator',
   Accusation: 'accuser',
   Defense: 'defender',
@@ -56,9 +56,9 @@ const CLUSTER_OF: Record<PersuasionTag, ClusterId> = {
   'Call for Action': 'informer',
 };
 
-type ClusterId = 'interrogator' | 'accuser' | 'defender' | 'informer';
+export type ClusterId = 'interrogator' | 'accuser' | 'defender' | 'informer';
 
-const CLUSTER_META: Record<ClusterId, { strategyId: string; persona: string }> = {
+export const CLUSTER_META: Record<ClusterId, { strategyId: string; persona: string }> = {
   interrogator: { strategyId: 'interrogator-probe', persona: '质询试探' },
   accuser: { strategyId: 'accuser-pressure', persona: '直接施压' },
   defender: { strategyId: 'defender-guard', persona: '稳守辩护' },

@@ -1,0 +1,41 @@
+{
+  "generatedBy": "server/tools/mine-outcomes.ts",
+  "splitSeed": 1,
+  "method": "玩家级主导说服标签→簇;endRoles→阵营(狼阵营=undercover 类比);ONUW 简化处决判定定胜方;winRate=该簇玩家所属阵营获胜的样本占比。只统计 train split、存在卧底类比方的局。",
+  "decidedGames": 97,
+  "eligiblePlayers": 426,
+  "baseline": {
+    "civilianWinRate": 0.5876,
+    "undercoverWinRate": 0.4124
+  },
+  "clusters": [
+    {
+      "id": "interrogator",
+      "persona": "质询试探",
+      "members": 189,
+      "wins": 97,
+      "winRate": 0.5132
+    },
+    {
+      "id": "accuser",
+      "persona": "直接施压",
+      "members": 97,
+      "wins": 47,
+      "winRate": 0.4845
+    },
+    {
+      "id": "defender",
+      "persona": "稳守辩护",
+      "members": 99,
+      "wins": 56,
+      "winRate": 0.5657
+    },
+    {
+      "id": "informer",
+      "persona": "举证定调",
+      "members": 41,
+      "wins": 21,
+      "winRate": 0.5122
+    }
+  ]
+}
