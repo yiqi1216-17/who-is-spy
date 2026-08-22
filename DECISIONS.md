@@ -269,6 +269,13 @@
   落盘前 `scanSecrets` 双保险)。验收 `eval/arms-race.test.ts`(7,含因果性:仅换 civSkill/spyBlend 胜率显著改变)+
   `corpus/mine-outcomes.test.ts`(9)。**诚实边界**:胜率摆动是**仿真**「离群度→投票」耦合的产物、非人类逐局回放;
   werewolf(ONUW)≠谁是卧底,是跨游戏迁移信号;三段摆动是**为演示军备竞赛动态而设计**的确定性机制。
-- 全局门禁再复核(2026-08-21 军备竞赛线):`npm run build` EXIT 0 · `npm run test:node` **326 通过(45 文件;
+- 军备竞赛「完整 trace 与日志」(04 §7.4,回应用户「没有完整的 trace 和日志吗」——2026-08-21):聚合胜率之上补**逐局逐轮**
+  可审计层。`eval/arms-race-trace.ts`(`extractGameTrace`/`renderGameTraceText`)把每局落为**描述→离群度→投票(带
+  `✓抓对`)→出局顺序→终局**;`--trace <path>` 落四档全量脱敏 JSONL(seed=7 共 **320 局**),`--sample N` 把每档
+  「卧底被抓/逃脱」各一例打到 stdout,Markdown 报告新增「§5 逐局复盘样本」内嵌两局机制示意。读者能亲眼看到:civ-awake
+  档卧底描述离群度最高(如 0.86)→ 三名平民 `✓抓对`;spy-counter 档卧底融入(离群度低)→ 平民互投、卧底逃脱。**脱敏**:
+  秘密词一律不落,只以 `wordTag`(FNV 8-hex 假名,同词同 tag)呈现,role 终局后揭示(与生产终局同口径),`scanSecrets`
+  恒空。验收 `eval/arms-race.test.ts` trace 组(4):结构完整/卧底第一轮多数最离群/JSONL 逐字节可复现+脱敏/可读复盘含抓对标记。
+- 全局门禁再复核(2026-08-21 军备竞赛 trace 层):`npm run build` EXIT 0 · `npm run test:node` **336 通过(45 文件;
   本机含 DeepSeek 真机 smoke,无密钥时该 1 例跳过)** · `npm run contract:node` **28 通过 / 0 失败** ·
   `npx openspec validate 04 --strict` valid。

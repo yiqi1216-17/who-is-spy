@@ -57,7 +57,7 @@ Human comparative evaluations SHALL randomize candidate labels and presentation 
 
 ### Requirement: Faction win-rate responds to strategy skill
 
-The evaluation system SHALL provide a per-faction win-rate comparison in which successive strategy iterations, run on identical seeds, random streams, and scripted human co-players, change civilian and undercover win-rates as a measurable function of strategy skill alone. Each step SHALL report the civilian and undercover win-rate deltas and whether the observed swing matches the declared intent, and the command SHALL exit non-zero if any step's swing contradicts its intent or any iteration fails to complete. Vote and description decisions in this mode MUST derive only from public descriptions and the agent's own identity, never from another player's hidden role or word.
+The evaluation system SHALL provide a per-faction win-rate comparison in which successive strategy iterations, run on identical seeds, random streams, and scripted human co-players, change civilian and undercover win-rates as a measurable function of strategy skill alone. Each step SHALL report the civilian and undercover win-rate deltas and whether the observed swing matches the declared intent, and the command SHALL exit non-zero if any step's swing contradicts its intent or any iteration fails to complete. Vote and description decisions in this mode MUST derive only from public descriptions and the agent's own identity, never from another player's hidden role or word. The system SHALL also be able to emit a complete per-game, per-round trace (descriptions with divergence, votes, eliminations, and the terminal winner) so the aggregate win-rate is auditable rather than opaque; that trace MUST NOT contain any secret word — each word appears only as a stable per-word pseudonym — and MUST reveal roles only after the game reaches a terminal state.
 
 #### Scenario: Civilian iteration raises the civilian win-rate
 - **WHEN** an iteration improves civilian identification skill while the undercover configuration is held fixed, on the same seed as the prior iteration
@@ -74,3 +74,8 @@ The evaluation system SHALL provide a per-faction win-rate comparison in which s
 #### Scenario: Skill mode reads only public information
 - **WHEN** an agent decides its vote in win-rate mode
 - **THEN** the decision is computed solely from published descriptions and the agent's own role and word, and no accepted vote targets a hidden field or an out-of-bounds player
+
+#### Scenario: Per-game trace is auditable yet leaks no secret
+- **WHEN** a win-rate iteration is exported as a per-game, per-round trace
+- **THEN** each round shows every player's description with its divergence, the ballots cast, the elimination order, and the terminal winner, so a reader can see how the win-rate was played out
+- **AND** no secret word appears in the trace — each word is shown only as a stable pseudonym so factions remain distinguishable without disclosure — and roles are attached only after the game is terminal, leaving the secret-scan output empty
