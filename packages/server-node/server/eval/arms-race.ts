@@ -4,6 +4,7 @@ import { ArmsRaceModel, type SkillProfile } from './arms-race-model.js';
 import { runSelfPlayBatch } from './self-play.js';
 import { evaluateSelfPlay } from './report.js';
 import type { ReportMetric } from './metrics.js';
+import { extractGameTrace, renderGameTraceText, type GameTrace } from './arms-race-trace.js';
 
 /**
  * 阵营胜率军备竞赛(OpenSpec 04 · 题面②「学了更强策略后,平民/卧底能不能更容易赢」)
@@ -37,6 +38,8 @@ export interface IterationOutcome {
   undercoverWinRate: number;
   completionRate: number;
   metrics: ReportMetric[];
+  /** 本档每一局的逐轮 trace(脱敏);供「胜率是怎么打出来的」逐局复盘。 */
+  traces: GameTrace[];
 }
 
 /** 跑一档技能到胜率结果。同 seed 下与其它档**唯一变量就是技能配置**。 */
@@ -50,6 +53,7 @@ export async function runIteration(skill: SkillProfile, games: number, seed: num
     undercoverWinRate: metricOf('undercover_win_rate'),
     completionRate: metricOf('completion_rate'),
     metrics: report.data.metrics,
+    traces: results.map((r, i) => extractGameTrace(r, skill.id, i)),
   };
 }
 
@@ -179,6 +183,21 @@ export function toArmsRaceLogLines(report: ArmsRaceReport): string[] {
   return lines;
 }
 
+/**
+ * 逐局逐轮 **trace** 的 JSONL 行(每局一行,含描述/离群度/投票/出局/终局)。脱敏:词只以 wordTag
+ * 假名呈现,role 在终局后呈现;`scanSecrets` 恒空。这是「完整日志」——回答「胜率是怎么打出来的」。
+ * traceGames 限制每档落多少局(默认全落;CLI 可调),避免大批次日志过大。
+ */
+export function toArmsRaceTraceLines(report: ArmsRaceReport, traceGames = Infinity): string[] {
+  const lines: string[] = [];
+  for (const it of report.iterations) {
+    for (const t of it.traces.slice(0, traceGames)) {
+      lines.push(JSON.stringify({ kind: 'trace', seed: report.seed, ...t }));
+    }
+  }
+  return lines;
+}
+
 // —— 报告渲染(纯字符串,便于测试与落盘) ——
 
 function fmtPct(n: number): string {
@@ -250,7 +269,32 @@ export function renderArmsRaceMarkdown(report: ArmsRaceReport): string {
   lines.push('  胜负有可测影响」,故把「更强的识别/伪装技能」映成某一方胜率上升,是有依据的设定而非凭空。');
   lines.push('');
 
-  lines.push('## 5. 方法学与诚实边界');
+  lines.push('## 5. 逐局复盘样本(胜率是怎么打出来的)');
+  lines.push('');
+  lines.push('聚合胜率之外,`--trace` 会落每局逐轮的**描述→离群度→投票→出局→终局**全过程(脱敏 JSONL,');
+  lines.push('词只以 `wordTag` 假名呈现)。下面从两个关键档各取一局对照,直观看到「技能↑ → 抓/逃更准」:');
+  lines.push('');
+  const sampleOf = (skillId: string, wantWinner: 'civilian' | 'undercover'): GameTrace | undefined => {
+    const it = report.iterations.find((x) => x.skill.id === skillId);
+    return it?.traces.find((t) => t.completed && t.winner === wantWinner && t.undercoverId !== null);
+  };
+  const samples: Array<{ caption: string; trace?: GameTrace }> = [
+    { caption: '**平民觉醒档**——平民按离群度锁定卧底(应见 `✓抓对`、平民胜):', trace: sampleOf('civ-awake', 'civilian') },
+    { caption: '**卧底反制档**——卧底融入平民簇 + 转移火力(卧底逃脱、卧底胜):', trace: sampleOf('spy-counter', 'undercover') },
+  ];
+  for (const { caption, trace } of samples) {
+    if (!trace) continue;
+    lines.push(caption);
+    lines.push('');
+    lines.push('```');
+    lines.push(renderGameTraceText(trace).replace(/^\n/, ''));
+    lines.push('```');
+    lines.push('');
+  }
+  lines.push('> 完整逐局逐轮日志见同目录 `04-arms-race-trace.jsonl`(每档全量);此处只摘两局作机制示意。');
+  lines.push('');
+
+  lines.push('## 6. 方法学与诚实边界');
   lines.push('');
   lines.push('- **胜负因果链**:描述由词决定「锚句簇」——平民同词聚簇、卧底异词离群;技术高的卧底以概率');
   lines.push('  借用平民锚句「融入」。投票时平民按公开描述的**离群度**锁定卧底(概率=civSkill),卧底则');

@@ -5,8 +5,10 @@ import {
   runArmsRace,
   runIteration,
   toArmsRaceLogLines,
+  toArmsRaceTraceLines,
   type Advantage,
 } from './arms-race.js';
+import { extractGameTrace, renderGameTraceText } from './arms-race-trace.js';
 import { ArmsRaceModel, type SkillProfile } from './arms-race-model.js';
 import { runSelfPlayBatch } from './self-play.js';
 import { projectStrategy, SEED_STRATEGIES } from '../strategies.js';
@@ -126,5 +128,101 @@ describe('隔离与落盘脱敏', () => {
     expect(md).toContain('军备竞赛裁决');
     expect(md).toContain('平民胜率');
     expect(md).toContain('卧底胜率');
+  }, 30_000);
+});
+
+describe('逐局逐轮 trace(「胜率是怎么打出来的」)', () => {
+  it('trace 完整还原一局:描述带离群度、票型、出局顺序、终局与卧底座位', async () => {
+    const { skills } = defaultSkills();
+    const results = await runSelfPlayBatch(new ArmsRaceModel(skills[1]), {
+      games: 8,
+      seed: SEED,
+      resolveStrategy: resolve,
+    });
+    const t = extractGameTrace(results[0], skills[1].id, 0);
+
+    // 结构完整
+    expect(t.players).toHaveLength(5);
+    expect(t.descriptions.length).toBeGreaterThan(0);
+    expect(t.votes.length).toBeGreaterThan(0);
+
+    // 恰有一名卧底,undercoverId 指向他
+    const undercovers = t.players.filter((p) => p.role === 'undercover');
+    expect(undercovers).toHaveLength(1);
+    expect(t.undercoverId).toBe(undercovers[0].id);
+
+    // 卧底的 wordTag 与全体平民不同(异词离群),平民之间彼此相同(同词聚簇)
+    const civTags = new Set(t.players.filter((p) => p.role === 'civilian' && !p.isHuman).map((p) => p.wordTag));
+    expect(civTags.size).toBe(1);
+    expect(civTags.has(undercovers[0].wordTag)).toBe(false);
+
+    // 每条 AI 描述都带 [0,1] 的离群度;人类陪跑记 0
+    for (const d of t.descriptions) {
+      expect(d.divergence).toBeGreaterThanOrEqual(0);
+      expect(d.divergence).toBeLessThanOrEqual(1);
+    }
+
+    // 出局顺序里的每个人都是本局玩家
+    const ids = new Set(t.players.map((p) => p.id));
+    for (const id of t.eliminations) expect(ids.has(id)).toBe(true);
+  }, 30_000);
+
+  it('平民觉醒档:卧底描述的离群度通常最高(平民识别信号成立)', async () => {
+    const { skills } = defaultSkills();
+    const results = await runSelfPlayBatch(new ArmsRaceModel(skills[1]), {
+      games: 30,
+      seed: SEED,
+      resolveStrategy: resolve,
+    });
+    let spyTopInRound1 = 0;
+    let total = 0;
+    for (const r of results) {
+      const t = extractGameTrace(r, skills[1].id, 0);
+      const round1 = t.descriptions.filter((d) => d.round === 1 && d.playerId !== 'human');
+      if (round1.length === 0 || t.undercoverId === null) continue;
+      total += 1;
+      const top = round1.reduce((a, b) => (b.divergence > a.divergence ? b : a));
+      if (top.playerId === t.undercoverId) spyTopInRound1 += 1;
+    }
+    // 不要求 100%(平民也可能偶发离群),但卧底应在多数局里是第一轮最离群者
+    expect(total).toBeGreaterThan(0);
+    expect(spyTopInRound1 / total).toBeGreaterThan(0.5);
+  }, 30_000);
+
+  it('trace JSONL 逐字节可复现,且扫不出任何密词(词只以 wordTag 假名呈现)', async () => {
+    const { skills, expectations } = defaultSkills();
+    const a = await runArmsRace(skills, expectations, 12, SEED);
+    const b = await runArmsRace(skills, expectations, 12, SEED);
+    const la = toArmsRaceTraceLines(a);
+    const lb = toArmsRaceTraceLines(b);
+    expect(la).toEqual(lb); // 同 seed 同配置逐字节相等
+    expect(la.length).toBe(4 * 12); // 四档 × 12 局
+
+    // 落盘脱敏:整块扫不出密词,且每行是合法 JSON、含 kind:'trace'
+    expect(scanSecrets(la.join('\n'))).toEqual([]);
+    for (const line of la) {
+      const obj = JSON.parse(line) as { kind: string; wordTag?: string };
+      expect(obj.kind).toBe('trace');
+    }
+  }, 30_000);
+
+  it('renderGameTraceText 输出可读复盘:含轮次/离群度/抓对标记/出局顺序,且无密词', async () => {
+    const { skills } = defaultSkills();
+    const results = await runSelfPlayBatch(new ArmsRaceModel(skills[1]), {
+      games: 8,
+      seed: SEED,
+      resolveStrategy: resolve,
+    });
+    // 找一局平民抓对卧底的(civ-awake 档常见),验证 ✓抓对 标记出现
+    const caught = results
+      .map((r, i) => extractGameTrace(r, skills[1].id, i))
+      .find((t) => t.winner === 'civilian' && t.completed && t.undercoverId !== null);
+    expect(caught).toBeDefined();
+    const text = renderGameTraceText(caught!);
+    expect(text).toContain('描述');
+    expect(text).toContain('离群度');
+    expect(text).toContain('投票');
+    expect(text).toContain('出局顺序');
+    expect(scanSecrets(text)).toEqual([]);
   }, 30_000);
 });
