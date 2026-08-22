@@ -10,7 +10,7 @@ Differentiated Agents are not convincing without paired evidence, and a model-ba
 - Separate contract, frozen-core, transfer, adversarial, unseen-word, rolling-challenge, human-preference, and product-playtest suites with contamination guards.
 - Produce versioned reports for safety, validity, behavior, calibration, latency, tokens, estimated cost, failures, and data-source counts.
 - Add deterministic non-zero quality gates, blinded human preference studies, controlled failure ingestion, and champion promotion/rollback manifests.
-- Add a per-faction win-rate arms race in which successive skill iterations, on identical seeds, move civilian and undercover win-rates as a function of strategy alone, grounded in win/loss signal mined from the human transfer corpus.
+- Add a per-faction win-rate arms race in which successive skill iterations, on identical seeds, move civilian and undercover win-rates as a function of strategy alone, grounded in win/loss signal mined from the human transfer corpus; include a rebalancing iteration where the undercover adopts a human sophistry tactic (steady-state disguise) to pull a corpus-skewed win-rate back toward parity, showing the arms race can re-level rather than run away.
 - Emit allowlisted decision lifecycle traces with stable identifiers, attempts, latency, usage, error classes, policy results, and commit status.
 - Consolidate transport, schema, policy, configuration, and unknown failures into a bounded retry taxonomy.
 - Add development-only fault injection and public-decision replay while keeping private candidates and secrets out of persistent artifacts.
