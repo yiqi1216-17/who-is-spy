@@ -107,9 +107,9 @@ export class DeepSeekClient implements GameModel {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        // 描述 ≤60 字,给足 JSON 包裹余量即封顶(160 ≈ 2.5× 正常长度):够长描述完整闭合 JSON,
-        // 又杜绝模型跑长。太紧会把 JSON 截断→解析失败→触发重试反而更慢,故留足余量。
-        const result = descriptionSchema.parse(await this.chatJson(messages, 0.8, 160));
+        // 不设 max_tokens 上限:deepseek-v4-flash 等推理型模型会先做隐藏推理再吐正文,
+        // 卡上限会让预算烧在推理上、正文被截断 → finish_reason=length 且 content 为空(线上 502 根因)。
+        const result = descriptionSchema.parse(await this.chatJson(messages, 0.8));
         if (result.description.includes(context.identity.word)) {
           throw new Error('描述包含秘密词');
         }
@@ -118,10 +118,7 @@ export class DeepSeekClient implements GameModel {
         lastError = error;
       }
     }
-    throw new ModelError(
-      `AI 未能生成合规描述，已自动重试；请再试一次 [诊断:${String((lastError as Error)?.message ?? lastError).slice(0, 200)}]`,
-      lastError,
-    );
+    throw new ModelError('AI 未能生成合规描述，已自动重试；请再试一次', lastError);
   }
 
   /**
@@ -163,7 +160,7 @@ export class DeepSeekClient implements GameModel {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const result = godDescribeSchema.parse(await this.chatJson(messages, 0.8, 160));
+        const result = godDescribeSchema.parse(await this.chatJson(messages, 0.8));
         if (result.description.includes(context.identity.word)) {
           throw new Error('描述包含秘密词');
         }
@@ -197,7 +194,7 @@ export class DeepSeekClient implements GameModel {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const result = voteSchema.parse(await this.chatJson(messages, 0.8, 160));
+        const result = voteSchema.parse(await this.chatJson(messages, 0.8));
         if (!targetIds.includes(result.targetId)) {
           throw new Error(`无效投票目标: ${result.targetId}`);
         }
@@ -293,10 +290,7 @@ export class DeepSeekClient implements GameModel {
         clearTimeout(timeout);
       }
     }
-    throw new ModelError(
-      `AI 服务暂时不可用 [底层:${String((lastError as Error)?.message ?? lastError).slice(0, 240)}]`,
-      lastError,
-    );
+    throw new ModelError('AI 服务暂时不可用，已自动重试；请稍后再试', lastError);
   }
 }
 

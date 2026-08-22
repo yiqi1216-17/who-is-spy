@@ -23,7 +23,7 @@ services:
       - key: DEEPSEEK_BASE_URL
         value: https://api.deepseek.com
       - key: DEEPSEEK_MODEL
-        value: deepseek-chat # 与本地 .env 一致且实测可用;deepseek-v4-flash 会返回空 content 导致 502
+        value: deepseek-v4-flash
       - key: DEEPSEEK_API_KEY
         sync: false # 唯一需要手填的密钥:创建时 Render 会提示输入,绝不入库
       # 可选:按余额调整三道闸(缺省 30 命令/分/IP · 6 局/时/IP · 150 局/天全局)

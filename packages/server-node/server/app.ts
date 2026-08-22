@@ -64,12 +64,6 @@ export function createApp(model: GameModel = new DeepSeekClient()) {
       ok: true,
       model: model.model,
       configured: model.isConfigured(),
-      // 临时诊断:回显后端实际所用配置(不含完整 key,仅尾号)以定位线上/本地差异。
-      diag: {
-        keyTail: (process.env.DEEPSEEK_API_KEY ?? '').slice(-6) || 'none',
-        baseUrl: process.env.DEEPSEEK_BASE_URL ?? 'default',
-        modelEnv: process.env.DEEPSEEK_MODEL ?? 'default',
-      },
     });
   });
 
