@@ -118,7 +118,10 @@ export class DeepSeekClient implements GameModel {
         lastError = error;
       }
     }
-    throw new ModelError('AI 未能生成合规描述，已自动重试；请再试一次', lastError);
+    throw new ModelError(
+      `AI 未能生成合规描述，已自动重试；请再试一次 [诊断:${String((lastError as Error)?.message ?? lastError).slice(0, 200)}]`,
+      lastError,
+    );
   }
 
   /**
