@@ -94,7 +94,9 @@
   出局顺序:老墨(平民) → 阿序(平民) → 弥生(平民)
 ```
 
-> 完整逐局逐轮日志见同目录 `04-arms-race-trace.jsonl`(每档全量);此处只摘两局作机制示意。
+> 三层日志(均在 `docs/evidence/`,由浅入深):`04-arms-race.jsonl`(聚合胜率+摆动+裁决)、
+> `04-arms-race-trace.jsonl`(每档全量逐局逐轮)、`04-arms-race-full.json`(前两者嵌套成一棵树+原始 metrics)。
+> 此处只摘两局作机制示意。
 
 ## 6. 方法学与诚实边界
 

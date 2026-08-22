@@ -7,11 +7,15 @@
  *   npm run arms-race:node -- --log docs/evidence/04-arms-race.jsonl    # 落聚合胜率 JSONL
  *   npm run arms-race:node -- --report docs/evidence/04-arms-race.md    # 落 Markdown 分析报告
  *   npm run arms-race:node -- --trace docs/evidence/04-arms-race-trace.jsonl  # 落逐局逐轮 trace
+ *   npm run arms-race:node -- --json-out docs/evidence/04-arms-race-full.json # 落完整报告 JSON(最深层)
  *   npm run arms-race:node -- --sample 1                    # stdout 打印每档抓/逃各一局完整复盘
- *   npm run arms-race:node -- --json                        # 机器可读整块 JSON
+ *   npm run arms-race:node -- --json                        # 机器可读整块 JSON(打到 stdout)
  *
- * 三种日志层次:①stdout 聚合摆动;②--log 聚合胜率 JSONL;③--trace 逐局逐轮(描述/离群度/
- * 投票/出局/终局)——回答「胜率是怎么打出来的」。--sample 把其中代表性对局打到 stdout。
+ * 三层日志(由浅入深,均可落盘到 docs/evidence):
+ *   ①--log   聚合胜率 JSONL(每档一行 + 逐步 diff + 裁决,~8 行)——回答「谁更容易赢、摆动成不成立」;
+ *   ②--trace 逐局逐轮 JSONL(每局一行:描述/离群度/投票/出局/终局)——回答「胜率是怎么打出来的」;
+ *   ③--json-out 完整报告 JSON(①的聚合 + ②的全部 trace 嵌套在一棵树里 + 原始 metrics)——单文件全量存档。
+ * --sample 把其中代表性对局打到 stdout。
  *
  * 退出码:未形成预期摆动(某步方向不符,或有未完局)→ **非零退出**(可作回归保护)。
  * 日志脱敏:落盘前对每一行 `scanSecrets`——trace 里词只以假名 wordTag 呈现、role 终局后揭示,
@@ -36,6 +40,7 @@ interface CliOptions {
   logPath?: string;
   reportPath?: string;
   tracePath?: string;
+  jsonPath?: string;
   sample: number;
   json: boolean;
 }
@@ -65,6 +70,9 @@ function parseArgs(argv: string[]): CliOptions {
         break;
       case '--trace':
         opts.tracePath = next();
+        break;
+      case '--json-out':
+        opts.jsonPath = next();
         break;
       case '--sample':
         opts.sample = Number(next());
@@ -139,6 +147,16 @@ async function main(): Promise<void> {
     mkdirSync(dirname(opts.tracePath), { recursive: true });
     writeFileSync(opts.tracePath, lines.join('\n') + '\n', 'utf8');
     console.log(`🔍 逐局逐轮 trace(脱敏 JSONL)已写入 ${opts.tracePath}(${lines.length} 局)`);
+  }
+
+  if (opts.jsonPath) {
+    // 最深一层:完整报告 JSON(每档指标 + 全部逐局 trace + 逐步 diff + 裁决)一块落盘。
+    const full = JSON.stringify(report, null, 2);
+    assertClean([full]);
+    mkdirSync(dirname(opts.jsonPath), { recursive: true });
+    writeFileSync(opts.jsonPath, full + '\n', 'utf8');
+    const traceCount = report.iterations.reduce((n, it) => n + it.traces.length, 0);
+    console.log(`🧬 完整报告 JSON(指标+${traceCount} 局 trace+摆动+裁决)已写入 ${opts.jsonPath}`);
   }
 
   if (opts.sample > 0) {
