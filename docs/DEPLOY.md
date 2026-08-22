@@ -21,7 +21,8 @@
 
 1. 把仓库推到 GitHub(私有仓库亦可)。
 2. [dashboard.render.com](https://dashboard.render.com) → **New → Blueprint** → 选本仓库。
-   Render 读取根目录 `render.yaml` 自动配置;创建时会提示输入 **`DEEPSEEK_API_KEY`**(唯一手填项)。
+   Render 读取根目录 `render.yaml` 自动配置(含 `region: singapore` —— 见「后端区域」一节,
+   务必确认区域是 Singapore 而非美国);创建时会提示输入 **`DEEPSEEK_API_KEY`**(唯一手填项)。
 3. 部署完成后拿到域名,形如 `https://who-is-spy-api.onrender.com`,验证:
 
    ```bash
@@ -59,6 +60,26 @@
 
 按余额估算日额:一局人类局 ≈ 15–25 次调用、上帝局 ≈ 30–80 次;deepseek-v4-flash
 单价低,150 局/天通常在几元人民币量级——请按自己的余额把 `PUBLIC_MAX_GAMES_PER_DAY` 调到安心值。
+
+## 后端区域:务必选新加坡(延迟命门)
+
+**这是整个部署最影响体验的一步。** DeepSeek 的 API 在中国境内;若后端在美国机房,
+每次模型调用都要跨太平洋往返,一轮描述(4 个 AI 串行、每个 1 次以上调用)会被放大到
+**~75 秒**。实测同一轮:美国机房 75.5s vs 就近机房 ~5-6s(**13 倍差**)。瓶颈是网络地理,
+不是模型速度,也不是"串行等待"。
+
+`render.yaml` 已声明 `region: singapore`。但 **Render 不支持给现有服务改区域**
+(https://render.com/docs/regions),必须**新建**一个新加坡服务:
+
+1. Render Dashboard → **New → Blueprint** → 选本仓库 → 读到 `region: singapore` 建新服务,
+   填入 `DEEPSEEK_API_KEY`。(或 New → Web Service 手动建,Region 选 **Singapore**。)
+2. 拿到新域名(如 `who-is-spy-api-sg.onrender.com`),更新根目录 `vercel.json` 的 rewrites
+   destination 为新域名 → 提交推送(Vercel 自动重部署前端)。
+3. 验证新服务:`curl https://<新域名>/api/health` 返回 `configured:true`;
+   在正式站玩一局,一轮描述应在 ~15-25s(含免费档冷启动首包)。
+4. 确认无误后,在 Render 删除旧的**美国**服务(省资源,避免两套并存)。
+
+> 迁移期两套服务可短暂并存:vercel.json 指向谁,前端就用谁,切换零停机。
 
 ## 已知限制(免费档如实说)
 
