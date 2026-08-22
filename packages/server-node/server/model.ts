@@ -293,7 +293,10 @@ export class DeepSeekClient implements GameModel {
         clearTimeout(timeout);
       }
     }
-    throw new ModelError('AI 服务暂时不可用，已自动重试；请稍后再试', lastError);
+    throw new ModelError(
+      `AI 服务暂时不可用 [底层:${String((lastError as Error)?.message ?? lastError).slice(0, 240)}]`,
+      lastError,
+    );
   }
 }
 
