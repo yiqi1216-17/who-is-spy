@@ -111,9 +111,12 @@ export function planBeats(
       .map((vote) => {
         const targetName = nameOf(vote.targetId);
         const isHumanVoter = vote.voterId === humanId;
+        // 已由预告帧实时直播过的 AI 票只做快速回带(键与 App 的投票预告一致:`v:round:voterId`);
+        // 人类票与未直播的票照旧全时长呈现。
+        const recapped = !isHumanVoter && seen?.has(`v:${vote.round}:${vote.voterId}`);
         return {
           id: `vote-${outcome.round}-${ballot}-${vote.voterId}`,
-          hold: HOLD.vote,
+          hold: recapped ? RECAP_HOLD : HOLD.vote,
           focusId: vote.voterId,
           suspectId: vote.targetId,
           spotlight: {

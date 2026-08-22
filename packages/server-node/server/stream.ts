@@ -69,18 +69,22 @@ export function formatEnd(end: StreamEnd): string {
 }
 
 /**
- * 生成途中的瞬态预告帧(体验修复:异步发言感):某席位刚说完一句、但整轮命令**尚未原子提交**。
- * 与事件信封的三点刻意区别:**无 seq**(不入日志、不参与 Last-Event-ID 重连补发)、
- * **不改变权威状态**(提交失败即作废,权威对账以 GET 为准)、**只承载本就会公开的字段**
- * (playerId/round/text,且 text 已过质量门——结构上不含密词)。
+ * 生成途中的瞬态预告帧(体验修复:异步发言感):某席位刚说完一句/刚投出一票、
+ * 但整轮命令**尚未原子提交**。与事件信封的三点刻意区别:**无 seq**(不入日志、不参与
+ * Last-Event-ID 重连补发)、**不改变权威状态**(提交失败即作废,权威对账以 GET 为准)、
+ * **只承载本就会公开的字段**——描述帧带 playerId/round/text(已过质量门,不含密词);
+ * 投票帧另带 targetId,text 为公开的投票理由(人类票在命令入口即锁定,AI 票的理由/目标
+ * 终局前后都会随 ballot 裁决公开,故先行直播不泄露任何未公开信息)。
  */
 export interface PreviewFrame {
   readonly v: typeof STREAM_VERSION;
   readonly gameId: string;
-  readonly kind: 'description';
+  readonly kind: 'description' | 'vote';
   readonly round: number;
   readonly playerId: string;
   readonly text: string;
+  /** 仅投票预告:被投席位 id(公开字段;人类票已在命令入口先行锁定,故不泄露未公开信息)。 */
+  readonly targetId?: string;
 }
 
 /** 纯函数:预告帧 → SSE 帧。刻意**不带 id 行**,浏览器 EventSource 不会把它记进 Last-Event-ID。 */

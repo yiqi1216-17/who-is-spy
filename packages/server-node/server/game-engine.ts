@@ -715,35 +715,51 @@ export class GameEngine {
 
   private async generateVotes(game: GameState): Promise<Vote[]> {
     const voters = game.players.filter((player) => !player.isHuman && player.alive);
-    return Promise.all(
-      voters.map(async (voter) => {
-        const allowed = this.allowedTargets(game, voter);
-        // 隐私(M 边界):只把非机密投影(id/name/isHuman/alive)交给模型——role/word
-        // 结构上无法随 allowedTargets 越界,不再依赖适配器自觉剥离(独立评审 ①×M 的结构性封堵)。
-        const allowedView: VoteTarget[] = allowed.map(({ id, name, isHuman, alive }) => ({
-          id,
-          name,
-          isHuman,
-          alive,
-        }));
-        const result = await this.model.vote(
-          buildAgentContext(game, voter, this.resolveStrategy(voter)),
-          allowedView,
-        );
-        // 授权:目标合法性由确定性代码裁决,不信任模型返回值——越界/已出局/自投一律
-        // 回落到确定性首选合法目标,杜绝 resolveBallot 误淘汰已出局者的状态腐坏。
-        const targetId = allowed.some((p) => p.id === result.targetId)
-          ? result.targetId
-          : allowed[0].id;
-        return {
-          voterId: voter.id,
-          targetId,
-          reason: result.reason,
-          round: game.round,
-          ballot: game.ballot,
-        };
-      }),
-    );
+    // 确定性座次**串行**(原并行改串行):投票隔离下每个投票者的上下文都**读不到**他人本轮的票
+    // (票只在 resolveBallot 原子裁决时才入 state),故串行与并行的裁决结果逐字节等价;
+    // 换来的收益是可**逐票直播**——投票同描述一样有「异步发言感」,不再等很久后一次性跳完。
+    const produced: Vote[] = [];
+    for (const voter of voters) {
+      const allowed = this.allowedTargets(game, voter);
+      // 隐私(M 边界):只把非机密投影(id/name/isHuman/alive)交给模型——role/word
+      // 结构上无法随 allowedTargets 越界,不再依赖适配器自觉剥离(独立评审 ①×M 的结构性封堵)。
+      const allowedView: VoteTarget[] = allowed.map(({ id, name, isHuman, alive }) => ({
+        id,
+        name,
+        isHuman,
+        alive,
+      }));
+      const result = await this.model.vote(
+        buildAgentContext(game, voter, this.resolveStrategy(voter)),
+        allowedView,
+      );
+      // 授权:目标合法性由确定性代码裁决,不信任模型返回值——越界/已出局/自投一律
+      // 回落到确定性首选合法目标,杜绝 resolveBallot 误淘汰已出局者的状态腐坏。
+      const targetId = allowed.some((p) => p.id === result.targetId)
+        ? result.targetId
+        : allowed[0].id;
+      const vote: Vote = {
+        voterId: voter.id,
+        targetId,
+        reason: result.reason,
+        round: game.round,
+        ballot: game.ballot,
+      };
+      produced.push(vote);
+      // 异步发言感(体验修复):这张票已定,立即经预告通道直播给订阅者。
+      // 瞬态帧不入 events/不带 seq——命令若在后续失败原子回滚,权威对账(GET)自然不含它;
+      // targetId/reason 均为公开字段(ballot 裁决时本会公开),故先播不泄露未公开信息。
+      this.bus.publishPreview({
+        v: STREAM_VERSION,
+        gameId: game.id,
+        kind: 'vote',
+        round: game.round,
+        playerId: voter.id,
+        targetId,
+        text: result.reason,
+      });
+    }
+    return produced;
   }
 
   private async resolveBallot(game: GameState, votes: Vote[]): Promise<void> {

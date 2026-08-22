@@ -1167,6 +1167,15 @@ p {
   background: var(--amber);
   animation: pulse 1.8s ease-in-out infinite;
 }
+.record-live {
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: rgba(216, 155, 63, 0.24);
+  color: var(--amber);
+  font-style: normal;
+  font-size: 0.62rem;
+}
 @keyframes pulse {
   0%,
   100% {
@@ -1269,6 +1278,25 @@ p {
   background: rgba(182, 77, 49, 0.14);
   border-color: rgba(182, 77, 49, 0.3);
   color: var(--rust-dark);
+}
+/* 直播中(尚未落权威 events)的瞬态行:虚线框 + 脉冲点,呈现"正在发生"。 */
+.event.pending {
+  opacity: 0.92;
+}
+.event.pending .event-marker {
+  background: rgba(216, 155, 63, 0.12);
+  border-style: dashed;
+  border-color: rgba(216, 155, 63, 0.5);
+}
+.event.pending .event-marker .live {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.event.pending .event-body small {
+  color: var(--amber);
 }
 .event-body small {
   font-family: var(--mono);

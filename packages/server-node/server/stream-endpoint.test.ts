@@ -177,6 +177,51 @@ describe('预告帧 · 引擎逐句直播(体验修复:异步发言感)', () => 
     expect(scanSecrets(JSON.stringify(previews))).toEqual([]);
   });
 
+  it('vote 命令期间:每张 AI 票产出即广播 vote 预告帧(带 targetId/理由),先于命令返回且不泄密', async () => {
+    const { engine } = createApp(new FakeGameModel());
+    const created = engine.createGame();
+    // 先由人类描述推进到投票相位。
+    const afterDescribe = await engine.submitHumanDescription(
+      created.id,
+      deterministicSafeHuman.describe(created, 1),
+    );
+
+    const votePreviews: Array<{ playerId: string; targetId?: string; text: string; atDone: boolean }> = [];
+    let commandDone = false;
+    const off = engine.onPreviews(created.id, (frame) => {
+      if (frame.kind !== 'vote') return; // 本用例只看投票预告
+      votePreviews.push({
+        playerId: frame.playerId,
+        targetId: frame.targetId,
+        text: frame.text,
+        atDone: commandDone,
+      });
+    });
+    const next = await engine.submitHumanVote(
+      created.id,
+      deterministicSafeHuman.vote(afterDescribe),
+    );
+    commandDone = true;
+    off();
+
+    // 四席 AI 逐票直播(人类另占一席),座次顺序,全部先于命令返回。
+    expect(votePreviews.map((p) => p.playerId)).toEqual(['ai-1', 'ai-2', 'ai-3', 'ai-4']);
+    expect(votePreviews.every((p) => !p.atDone)).toBe(true);
+    // 每帧都带合法的被投席位 id 与非空理由(公开字段)。
+    for (const preview of votePreviews) {
+      expect(preview.targetId && preview.targetId.length > 0).toBe(true);
+      expect(preview.text.length).toBeGreaterThan(0);
+    }
+    // 权威票型里能逐条对上(先播不改权威裁决)。
+    for (const preview of votePreviews) {
+      expect(
+        next.votes.some((v) => v.voterId === preview.playerId && v.targetId === preview.targetId),
+      ).toBe(true);
+    }
+    // 隐私:vote 预告序列化后扫不出任何密词。
+    expect(scanSecrets(JSON.stringify(votePreviews))).toEqual([]);
+  });
+
   it('未知对局订阅预告 → 404 语义;退订后不再收到', async () => {
     const { engine } = createApp(new FakeGameModel());
     expect(() => engine.onPreviews('does-not-exist', () => {})).toThrow(/不存在|过期/);

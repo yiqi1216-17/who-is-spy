@@ -18,6 +18,7 @@ import { characterFor, SEAT_ORDER } from '../characters';
 import { StageBackdrop, type PortraitState } from '../art/portraits';
 import { seatState, type Interaction, type Spotlight } from '../director';
 import type { PublicGameState } from '../types';
+import type { PreviewFrame } from '../stream';
 import { Seat } from '../components/Seat';
 
 /**
@@ -29,6 +30,8 @@ import { Seat } from '../components/Seat';
  */
 export interface StageProps {
   game: PublicGameState;
+  /** 生成途中经 SSE 直播、但尚未落入权威 events 的瞬态发言/票(供「公开记录」抽屉即时留痕)。 */
+  livePreviews: PreviewFrame[];
   spotlight: Spotlight | null;
   focusId: string | null;
   suspectId: string | null;
@@ -145,12 +148,18 @@ export function StageScreen(props: StageProps) {
         <span className="live" />
         <ScrollText size={14} />
         公开记录 · {game.events.length}
+        {props.livePreviews.length > 0 && <em className="record-live">直播 +{props.livePreviews.length}</em>}
       </button>
 
       <Dock {...props} />
 
       {sheetOpen && (
-        <RecordSheet game={game} nameOf={nameOf} onClose={() => setSheetOpen(false)} />
+        <RecordSheet
+          game={game}
+          livePreviews={props.livePreviews}
+          nameOf={nameOf}
+          onClose={() => setSheetOpen(false)}
+        />
       )}
 
       {props.overlayKind && (
@@ -317,13 +326,26 @@ function Dock(props: StageProps) {
 
 function RecordSheet({
   game,
+  livePreviews,
   nameOf,
   onClose,
 }: {
   game: PublicGameState;
+  livePreviews: PreviewFrame[];
   nameOf: (id?: string) => string;
   onClose: () => void;
 }) {
+  // 直播留痕:只显示尚未落入权威 events 的瞬态帧——某席位的描述一旦作为权威事件补齐,
+  // 就从直播区隐去(去重以本轮 playerId+kind 命中权威 descriptions/votes 为准),避免重影。
+  const committedDesc = new Set(
+    game.descriptions.filter((d) => d.round === game.round).map((d) => d.playerId),
+  );
+  const committedVotes = new Set(
+    game.votes.filter((v) => v.round === game.round).map((v) => v.voterId),
+  );
+  const pending = livePreviews.filter((frame) =>
+    frame.kind === 'vote' ? !committedVotes.has(frame.playerId) : !committedDesc.has(frame.playerId),
+  );
   return (
     <>
       <div className="sheet-backdrop" onClick={onClose} />
@@ -352,6 +374,24 @@ function RecordSheet({
                         : '主持人'}
                 </small>
                 <p>{event.text}</p>
+              </div>
+            </div>
+          ))}
+          {pending.map((frame) => (
+            <div className={`event ${frame.kind} pending`} key={`live-${frame.kind}-${frame.playerId}`}>
+              <span className="event-marker">
+                <span className="live" />
+              </span>
+              <div className="event-body">
+                <small>
+                  {nameOf(frame.playerId)} · 第 {frame.round} 轮 ·{' '}
+                  {frame.kind === 'vote' ? '正在投票' : '正在描述'}
+                </small>
+                <p>
+                  {frame.kind === 'vote' && frame.targetId
+                    ? `投「${nameOf(frame.targetId)}」· ${frame.text}`
+                    : frame.text}
+                </p>
               </div>
             </div>
           ))}

@@ -59,10 +59,12 @@ export function resyncFrom(events: readonly GameEvent[]): FollowState {
 export interface PreviewFrame {
   readonly v: number;
   readonly gameId: string;
-  readonly kind: 'description';
+  readonly kind: 'description' | 'vote';
   readonly round: number;
   readonly playerId: string;
   readonly text: string;
+  /** 仅投票预告:被投席位 id。 */
+  readonly targetId?: string;
 }
 
 /** 最小 EventSource 抽象:便于以假源在无浏览器环境下测试跟播粘合层。 */
@@ -115,7 +117,8 @@ export function followGame(
     } catch {
       return;
     }
-    if (frame.kind === 'description' && frame.gameId === gameId) handlers.onPreview(frame);
+    if ((frame.kind === 'description' || frame.kind === 'vote') && frame.gameId === gameId)
+      handlers.onPreview(frame);
   });
 
   source.addEventListener('end', () => {

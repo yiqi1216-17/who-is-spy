@@ -10,7 +10,7 @@ import {
   type Interaction,
   type Spotlight,
 } from './director';
-import { followGame, type Follower } from './stream';
+import { followGame, type Follower, type PreviewFrame } from './stream';
 import { initialState, overlay, reduce } from './presentation/machine';
 import { HomeScreen, type HomeMode } from './screens/HomeScreen';
 import { RevealScreen } from './screens/RevealScreen';
@@ -65,9 +65,14 @@ export function App() {
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(() => new Set());
   const appliedRef = useRef<Set<string>>(new Set());
 
-  // 生成途中已被 SSE 预告帧直播过的证词键(`round:playerId`):
+  // 生成途中已被 SSE 预告帧直播过的证词/票键(`round:playerId` / `v:round:voterId`):
   // 命令返回后 planBeats 据此只做快速回带,不再全时长重放(异步发言感)。
   const liveSeenRef = useRef<Set<string>>(new Set());
+
+  // 生成途中已直播的瞬态发言缓冲(体验修复:直播留痕):
+  // 权威 events 要等命令返回才落库,期间用户翻「公开记录」抽屉会扑空——这里把逐句/逐票预告
+  // 暂存进来,抽屉以「直播中」态呈现;命令返回、权威事件补齐后即整体清空(以 GET 为准)。
+  const [livePreviews, setLivePreviews] = useState<PreviewFrame[]>([]);
 
   const queueEmpty = beatIndex >= beats.length;
 
@@ -87,34 +92,51 @@ export function App() {
     };
   }, []);
 
-  // —— 生成直播(体验修复:异步发言感)——
-  // 每局挂一条 SSE:AI 每说完一句,服务端立刻推瞬态预告帧;此刻 HTTP 命令仍在途、
-  // 放映队列空转,预告帧直接点亮席位与聚光(全时长自适应停留),观众即时读到。
+  // —— 生成直播(体验修复:异步发言感 + 直播留痕)——
+  // 每局挂一条 SSE:AI 每说完一句 / 投出一票,服务端立刻推瞬态预告帧;此刻 HTTP 命令仍在途、
+  // 放映队列空转,预告帧直接点亮席位与聚光,并写进 livePreviews 供「公开记录」抽屉即时呈现。
   // 命令返回后 planBeats 见 liveSeen 只做 0.6s 快速回带,状态机/揭示记账照常,权威性不受影响。
   const gameId = game?.id ?? null;
   useEffect(() => {
     if (!gameId) return;
     liveSeenRef.current = new Set();
+    setLivePreviews([]);
     let follower: Follower | null = null;
     let clearTimer: number | undefined;
+    const applyPreview = (frame: PreviewFrame): void => {
+      // 键区分描述与投票,避免同轮 round:playerId 撞车(投票键加 `v:` 前缀)。
+      const seenKey =
+        frame.kind === 'vote' ? `v:${frame.round}:${frame.playerId}` : `${frame.round}:${frame.playerId}`;
+      liveSeenRef.current.add(seenKey);
+      // 抽屉留痕:同键去重后追加(重连补发/重复帧不重复入列)。
+      setLivePreviews((prev) =>
+        prev.some((p) => p.kind === frame.kind && p.round === frame.round && p.playerId === frame.playerId)
+          ? prev
+          : [...prev, frame],
+      );
+      setView((prev) => ({
+        ...prev,
+        focusId: frame.playerId,
+        suspectId: frame.kind === 'vote' ? frame.targetId ?? prev.suspectId : prev.suspectId,
+        spotlight: {
+          speakerId: frame.playerId,
+          text: frame.text,
+          muted: false,
+          kind: frame.kind === 'vote' ? 'vote' : 'testimony',
+        },
+      }));
+      // 一句/一票读完后回到「斟酌中」留白,等下一帧;命令返回起播时该定时器已被新拍覆盖。
+      if (clearTimer !== undefined) window.clearTimeout(clearTimer);
+      clearTimer = window.setTimeout(() => {
+        setView((prev) =>
+          prev.focusId === frame.playerId ? { ...prev, focusId: null, spotlight: null } : prev,
+        );
+      }, testimonyHold(frame.text));
+    };
     try {
       follower = followGame(gameId, {
         onEvent: () => {}, // 权威事件仍由 HTTP 响应统一放映(单一放映管线)
-        onPreview: (frame) => {
-          liveSeenRef.current.add(`${frame.round}:${frame.playerId}`);
-          setView((prev) => ({
-            ...prev,
-            focusId: frame.playerId,
-            spotlight: { speakerId: frame.playerId, text: frame.text, muted: false },
-          }));
-          // 一句读完后回到「斟酌中」留白,等下一句;命令返回起播时该定时器已被新拍覆盖。
-          if (clearTimer !== undefined) window.clearTimeout(clearTimer);
-          clearTimer = window.setTimeout(() => {
-            setView((prev) =>
-              prev.focusId === frame.playerId ? { ...prev, focusId: null, spotlight: null } : prev,
-            );
-          }, testimonyHold(frame.text));
-        },
+        onPreview: applyPreview,
       });
     } catch {
       // EventSource 不可用(极老环境):静默回退为原「等待→整段放映」体验。
@@ -183,6 +205,7 @@ export function App() {
     setGame(null);
     setBeats([]);
     setBeatIndex(0);
+    setLivePreviews([]);
     appliedRef.current = new Set();
     setRevealed(new Set());
     setView(EMPTY_VIEW);
@@ -241,6 +264,7 @@ export function App() {
     try {
       const next = await api.describe(game.id, text);
       setGame(next);
+      setLivePreviews([]); // 权威事件已落库,清空直播缓冲(改由 events 呈现)
       setDescription('');
       dispatch({ type: 'HUMAN_DESCRIBED' });
       startSegment(planBeats(next, from, 'testimony', liveSeenRef.current));
@@ -260,9 +284,10 @@ export function App() {
     try {
       const next = await api.vote(game.id, selectedTarget);
       setGame(next);
+      setLivePreviews([]); // 权威票型已落库,清空直播缓冲
       setSelectedTarget('');
       if (wasHumanAction) dispatch({ type: 'HUMAN_VOTED' });
-      startSegment(planBeats(next, from, 'voting'));
+      startSegment(planBeats(next, from, 'voting', liveSeenRef.current));
     } catch (cause) {
       handleFailure(cause);
     } finally {
@@ -278,6 +303,7 @@ export function App() {
     try {
       const next = await api.continue(game.id);
       setGame(next);
+      setLivePreviews([]); // 权威事件已落库,清空直播缓冲
       startSegment(planBeats(next, from, pres.phase, liveSeenRef.current));
     } catch (cause) {
       handleFailure(cause);
@@ -334,6 +360,7 @@ export function App() {
     screen = (
       <StageScreen
         game={game}
+        livePreviews={livePreviews}
         spotlight={view.spotlight}
         focusId={view.focusId}
         suspectId={view.suspectId}
