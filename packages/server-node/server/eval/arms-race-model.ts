@@ -41,6 +41,19 @@ export interface SkillProfile {
   spyBlend: number;
   /** 卧底把票投向领先平民(转移火力)的概率;否则回落确定性首选。 */
   spyDeflect: number;
+  /**
+   * 诡辩/**稳态伪装**(人类高手手法):blend 决策**去掉轮次盐** → 全程一致的假故事,而非逐轮
+   * 即兴。这样消除了 civMode='cumulative' 平民赖以识别的「露馅轮」——一次编好、轮轮咬定的谎言,
+   * 比临时圆的谎更难被跨轮累计抓住。默认 undefined(=逐轮独立,保持既有档位逐字节不变)。
+   */
+  spyConsistent?: boolean;
+  /**
+   * 平民**确信阈值**(诡辩局的另一面):只有当「最离群者」比次离群者的离群度**领先 ≥ 该值**时,
+   * 平民才敢锁定他;否则视作「场上人人相似、无从分辨」→ 退回非信号回落。稳态诡辩的卧底把自己
+   * 的锚句与平民抹平,离群度差被压到阈值之下 → 平民的识别信号**结构性失灵**。这正是「诡辩让所有人
+   * 看起来同样可信」的机制刻画。默认 undefined(=任意正差即锁定,保持既有档位逐字节不变)。
+   */
+  identifyGap?: number;
 }
 
 /**
@@ -66,6 +79,13 @@ const TAIL: readonly string[] = [
 
 const ANCHOR_WINDOW = 2;
 const TAIL_WINDOW = 2;
+
+/**
+ * 稳态伪装(诡辩档)的**固定中性掩护词**:当卧底选择伪装、但本轮尚无平民可借其锚时,退回这个
+ * 恒定的中性主题(而非自身词主题)。全程恒定 → 不制造露馅轮,与「借邻座锚」同属一套自洽假故事。
+ * 取一个与 24 候选密词正交的中性词,使其锚窗稳定落在人人都认同的泛化措辞上。
+ */
+const NEUTRAL_COVER = '寻常';
 /** 每个座次在 TAIL 里的专属段长度(3 句,足够 3 轮各取 2 句且逐轮前进不重复)。 */
 const TAIL_STRIDE = 3;
 
@@ -128,7 +148,11 @@ export class ArmsRaceModel implements GameModel {
     // 以 spyBlend 概率借用**已公开的某位平民**的锚句(从公开描述学邻座措辞)→ 混进平民簇。
     // 关键:blend 掷骰**逐轮独立**——blend<1 的卧底会在某些轮「露馅」(用回自己的锚)。单轮平民
     // 可能错过那一轮,但**跨轮累计**(civMode='cumulative')会把露馅轮的离群度累进来 → 抓住不稳的融入。
-    const blendBit = hash32(`${word}|${seat}|${context.game.round}|blend`) / 0xffffffff;
+    //
+    // 诡辩/稳态伪装(spyConsistent):掷骰**去掉轮次盐** → 全程同一决策,不再有露馅轮。这正是
+    // 人类高手对付「跨轮累计」的手法——编一个从头到尾自洽的假故事、轮轮咬定,而非临时圆谎。
+    const blendSalt = this.skill.spyConsistent ? `${word}|${seat}|blend` : `${word}|${seat}|${context.game.round}|blend`;
+    const blendBit = hash32(blendSalt) / 0xffffffff;
     if (blendBit < this.skill.spyBlend) {
       const peer = context.game.publicDescriptions.find(
         (d) => d.playerId !== context.identity.playerId && d.playerId !== 'human',
@@ -137,6 +161,9 @@ export class ArmsRaceModel implements GameModel {
         const borrowed = ANCHOR.filter((a) => peer.text.includes(a)).slice(0, ANCHOR_WINDOW);
         if (borrowed.length > 0) return [...borrowed, ...tail].join(SEP);
       }
+      // 稳态伪装但本轮尚无平民可借(如首轮先发)→ 用**共享中性锚**兜底,仍不暴露自身词主题;
+      // 逐轮档在这种情形回落自身词锚(见下),稳态档则坚持中性 → 跨轮一致、不制造露馅轮。
+      if (this.skill.spyConsistent) return [...anchorPhrases(NEUTRAL_COVER), ...tail].join(SEP);
     }
     return [...anchorPhrases(word), ...tail].join(SEP);
   }
@@ -171,8 +198,15 @@ export class ArmsRaceModel implements GameModel {
 
     // 平民:以概率 civSkill 投「最离群者」(疑似卧底);否则回落。
     if (gate('civ') < this.skill.civSkill) {
-      const target = this.mostDivergent(allowed, relevant);
-      if (target) return { targetId: target, reason: '这一位的描述和大家的偏差最大，我怀疑他' };
+      const ranked = this.rankedDivergence(allowed, relevant);
+      // 确信阈值:诡辩局要求「最离群者比次离群者领先足够多」才敢锁定。稳态诡辩把离群度抹平,
+      // 领先差被压到阈值之下 → 平民「看谁都差不多」,识别信号失灵,退回非信号回落。
+      const gapOk =
+        this.skill.identifyGap === undefined ||
+        (ranked.length >= 2 ? ranked[0].score - ranked[1].score >= this.skill.identifyGap : true);
+      if (ranked.length > 0 && gapOk) {
+        return { targetId: ranked[0].id, reason: '这一位的描述和大家的偏差最大，我怀疑他' };
+      }
     }
     return { targetId: fallbackPick('civ').id, reason: '暂时先跟随场上多数的判断' };
   }
@@ -197,23 +231,39 @@ export class ArmsRaceModel implements GameModel {
     descs: ReadonlyArray<{ playerId: string; text: string }>,
     pole: 'max' | 'min',
   ): string | null {
-    // 只在**AI 描述者**间比较离群度:human 座位由确定性脚本陪跑(安全轮换句,与 AI 措辞天然
-    // 无关),是识别噪声而非军备竞赛的建模对象——纳入会让「最离群」恒指向 human。因此候选与
-    // 对照集都排除 human;当卧底恰是 human 时,该识别通道自然失效(卧底靠陪跑身份逃脱)。
+    const ranked = this.rankedDivergence(allowed, descs); // 降序:离群度高 → 低;同分按 allowed 原序
+    if (ranked.length === 0) return null;
+    if (pole === 'max') return ranked[0].id;
+    // min:取最低分,同分保持 allowed 原序的**第一个**(与既有档位行为逐字节一致)。
+    const min = ranked.reduce((a, b) => (b.score < a.score ? b : a));
+    return ranked.find((r) => r.score === min.score)!.id;
+  }
+
+  /**
+   * 给 allowed 候选按离群度**降序**打分(与其余 AI 描述的平均不相似度)。返回 `{id, score}[]`,
+   * 供「最离群者 + 确信阈值(top1−top2 gap)」判定。同分时保持 allowed 顺序稳定(确定性)。
+   *
+   * 只在**AI 描述者**间比较:human 座位由确定性脚本陪跑(安全轮换句,与 AI 措辞天然无关),是
+   * 识别噪声而非建模对象——纳入会让「最离群」恒指向 human。故候选与对照集都排除 human;卧底恰是
+   * human 时该识别通道自然失效(靠陪跑身份逃脱)。
+   */
+  private rankedDivergence(
+    allowed: VoteTarget[],
+    descs: ReadonlyArray<{ playerId: string; text: string }>,
+  ): Array<{ id: string; score: number }> {
     const byPlayer = new Map<string, string[]>();
     for (const d of descs) {
       if (d.playerId === 'human') continue;
       byPlayer.set(d.playerId, [...(byPlayer.get(d.playerId) ?? []), d.text]);
     }
 
-    let bestId: string | null = null;
-    let bestScore = pole === 'max' ? -1 : 2;
-    for (const cand of allowed) {
-      if (cand.isHuman) continue;
+    const scored: Array<{ id: string; score: number; order: number }> = [];
+    allowed.forEach((cand, order) => {
+      if (cand.isHuman) return;
       const own = byPlayer.get(cand.id);
-      if (!own || own.length === 0) continue;
+      if (!own || own.length === 0) return;
       const others = [...byPlayer.entries()].filter(([id]) => id !== cand.id);
-      if (others.length === 0) continue;
+      if (others.length === 0) return;
       // 候选每条描述 vs 每个他人每条描述的平均相似度 → 不相似度 = 1 − 均值。
       let sum = 0;
       let n = 0;
@@ -225,13 +275,11 @@ export class ArmsRaceModel implements GameModel {
           }
         }
       }
-      const divergence = n === 0 ? 0 : 1 - sum / n;
-      if ((pole === 'max' && divergence > bestScore) || (pole === 'min' && divergence < bestScore)) {
-        bestScore = divergence;
-        bestId = cand.id;
-      }
-    }
-    return bestId;
+      scored.push({ id: cand.id, score: n === 0 ? 0 : 1 - sum / n, order });
+    });
+    // 降序按 score;同分按 allowed 原序稳定(确定性,不引入隐藏偏置)。
+    scored.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.order - b.order));
+    return scored.map(({ id, score }) => ({ id, score }));
   }
 
   async review(game: GameState): Promise<GameReview> {

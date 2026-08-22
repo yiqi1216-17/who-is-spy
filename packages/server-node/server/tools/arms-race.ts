@@ -28,6 +28,7 @@ import {
   defaultSkills,
   renderArmsRaceMarkdown,
   runArmsRace,
+  swingPattern,
   toArmsRaceLogLines,
   toArmsRaceTraceLines,
   type ArmsRaceReport,
@@ -103,7 +104,9 @@ function printLog(report: ArmsRaceReport): void {
       `  ${s.from} → ${s.to}  平民Δ=${(s.civilianDelta * 100).toFixed(1)}pp  卧底Δ=${(s.undercoverDelta * 100).toFixed(1)}pp  期望[${s.expected}] 实际[${s.actual}] ${flag}`,
     );
   }
-  console.log(`\n军备竞赛裁决:${report.armsRaceHolds ? '✅ 三步摆动成立(civ↑→spy↑→civ↑)' : '⚠ 未完全成立'}\n`);
+  console.log(
+    `\n军备竞赛裁决:${report.armsRaceHolds ? `✅ ${report.steps.length} 步摆动成立(${swingPattern(report)})` : '⚠ 未完全成立'}\n`,
+  );
 }
 
 /** 落盘前脱敏校验:任一行命中机密即抛,拒绝写出。 */

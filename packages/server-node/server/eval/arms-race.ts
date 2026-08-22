@@ -14,8 +14,14 @@ import { extractGameTrace, renderGameTraceText, type GameTrace } from './arms-ra
  *   iter-0 baseline:双方都不太会玩(civSkill 低)——接近随机基线;
  *   iter-1 平民觉醒:平民学会按离群度锁定卧底 → civilian_win_rate ↑;
  *   iter-2 卧底反制:卧底学会「融入平民簇 + 转移火力」→ undercover_win_rate ↑;
- *   iter-3 平民精进:平民改用**跨轮累计**离群度,抓住不稳的融入 → civilian_win_rate 再 ↑。
- * 每一步产出 civilian/undercover 胜率的 diff,并断言**摆动方向**(civ↑ / spy↑ / civ↑)。
+ *   iter-3 平民精进:平民改用**跨轮累计**离群度,抓住不稳的融入 → civilian_win_rate 再 ↑;
+ *   iter-4 卧底诡辩:卧底改用**稳态伪装**(全程一致的假故事,不再逐轮露馅)+ 平民确信阈值——
+ *     离群度被抹平到「人人看起来同样可信」,平民识别信号失灵 → undercover_win_rate 回升、胜率**重新均衡**。
+ * 每一步产出 civilian/undercover 胜率的 diff,并断言**摆动方向**(civ↑→spy↑→civ↑→spy↑)。
+ *
+ * 背景:词库(`words.ts`)追加高反差趣味词对后,卧底的异词更易暴露 → civ-refined 档平民一度大幅占优
+ * (~76% vs 24%)。iter-4 正是对此的**策略回应**:用人类高手的「诡辩/稳态伪装」把胜率拉回 ~50/50,
+ * 演示「benchmark 上继续提升策略 → 失衡的胜率可被重新拉平」这一军备竞赛的下一回合。
  *
  * 技能档位的**数据依据**:见 `data:outcomes` 挖出的 outcome-correlation-report.json——
  * werewolf train split 上「村民类比方经验胜率 ≈ 58.8%」「不同话风簇获胜占比 48%–57%」证实
@@ -82,6 +88,12 @@ function advantageOf(civDelta: number, spyDelta: number): Advantage {
   return 'none';
 }
 
+/** 把逐步摆动方向拼成箭头串,如 `civ↑→spy↑→civ↑→spy↑`(按期望意图,反映军备竞赛的往复)。 */
+export function swingPattern(report: ArmsRaceReport): string {
+  const mark: Record<Advantage, string> = { civilian: 'civ↑', undercover: 'spy↑', none: '＝' };
+  return report.steps.map((s) => mark[s.expected]).join('→');
+}
+
 /** 完整军备竞赛结果:每档结果 + 逐步胜率 diff + 总体是否形成预期摆动。 */
 export interface ArmsRaceReport {
   games: number;
@@ -144,8 +156,18 @@ export function defaultSkills(): { skills: SkillProfile[]; expectations: Advanta
     { id: 'civ-awake', label: '平民觉醒(按离群度锁定卧底)', civSkill: 0.85, civMode: 'round', spyBlend: 0.15, spyDeflect: 0.1 },
     { id: 'spy-counter', label: '卧底反制(融入平民簇 + 转移火力)', civSkill: 0.85, civMode: 'round', spyBlend: 0.85, spyDeflect: 0.7 },
     { id: 'civ-refined', label: '平民精进(跨轮累计离群度)', civSkill: 1.0, civMode: 'cumulative', spyBlend: 0.85, spyDeflect: 0.7 },
+    {
+      id: 'spy-sophist',
+      label: '卧底诡辩(稳态伪装 + 一致假故事,抹平离群度)',
+      civSkill: 1.0,
+      civMode: 'cumulative',
+      spyBlend: 0.95,
+      spyDeflect: 0.7,
+      spyConsistent: true,
+      identifyGap: 0.06,
+    },
   ];
-  const expectations: Advantage[] = ['none', 'civilian', 'undercover', 'civilian'];
+  const expectations: Advantage[] = ['none', 'civilian', 'undercover', 'civilian', 'undercover'];
   return { skills, expectations };
 }
 
@@ -252,9 +274,9 @@ export function renderArmsRaceMarkdown(report: ArmsRaceReport): string {
   lines.push('## 3. 军备竞赛裁决');
   lines.push('');
   if (report.armsRaceHolds) {
-    lines.push('**✅ 军备竞赛成立**:三步摆动均按设计意图发生——');
-    lines.push('平民觉醒 → 平民更容易赢;卧底反制 → 卧底扳回;平民精进 → 平民再度占优。每一步都在 100% 完局下取得。');
-    lines.push('这正是「基于 benchmark 与数据不断迭代、能看到某一方胜率被提升」的闭环证据。');
+    lines.push(`**✅ 军备竞赛成立**:${report.steps.length} 步摆动均按设计意图发生(${swingPattern(report)})——`);
+    lines.push('平民觉醒 → 平民更容易赢;卧底反制 → 卧底扳回;平民精进 → 平民再度占优;卧底诡辩(稳态伪装抹平离群度)→ 胜率被拉回均衡。每一步都在 100% 完局下取得。');
+    lines.push('这正是「基于 benchmark 与数据不断迭代、能看到某一方胜率被提升 / 被重新拉平」的闭环证据。');
   } else {
     lines.push('**⚠ 摆动未完全成立**:至少一步的胜率变化方向与设计意图不符(见上表「摆动一致」列),或存在未完局。');
     lines.push('需回看该步技能档位标定或增大 games/换 seed 复核。');
@@ -272,7 +294,7 @@ export function renderArmsRaceMarkdown(report: ArmsRaceReport): string {
   lines.push('## 5. 逐局复盘样本(胜率是怎么打出来的)');
   lines.push('');
   lines.push('聚合胜率之外,`--trace` 会落每局逐轮的**描述→离群度→投票→出局→终局**全过程(脱敏 JSONL,');
-  lines.push('词只以 `wordTag` 假名呈现)。下面从两个关键档各取一局对照,直观看到「技能↑ → 抓/逃更准」:');
+  lines.push('词只以 `wordTag` 假名呈现)。下面从三个关键档各取一局对照,直观看到「技能↑ → 抓/逃更准」:');
   lines.push('');
   const sampleOf = (skillId: string, wantWinner: 'civilian' | 'undercover'): GameTrace | undefined => {
     const it = report.iterations.find((x) => x.skill.id === skillId);
@@ -281,6 +303,7 @@ export function renderArmsRaceMarkdown(report: ArmsRaceReport): string {
   const samples: Array<{ caption: string; trace?: GameTrace }> = [
     { caption: '**平民觉醒档**——平民按离群度锁定卧底(应见 `✓抓对`、平民胜):', trace: sampleOf('civ-awake', 'civilian') },
     { caption: '**卧底反制档**——卧底融入平民簇 + 转移火力(卧底逃脱、卧底胜):', trace: sampleOf('spy-counter', 'undercover') },
+    { caption: '**卧底诡辩档**——稳态伪装抹平离群度,平民「看谁都差不多」而失手(卧底逃脱、卧底胜):', trace: sampleOf('spy-sophist', 'undercover') },
   ];
   for (const { caption, trace } of samples) {
     if (!trace) continue;
@@ -293,7 +316,7 @@ export function renderArmsRaceMarkdown(report: ArmsRaceReport): string {
   }
   lines.push('> 三层日志(均在 `docs/evidence/`,由浅入深):`04-arms-race.jsonl`(聚合胜率+摆动+裁决)、');
   lines.push('> `04-arms-race-trace.jsonl`(每档全量逐局逐轮)、`04-arms-race-full.json`(前两者嵌套成一棵树+原始 metrics)。');
-  lines.push('> 此处只摘两局作机制示意。');
+  lines.push('> 此处只摘三局作机制示意。');
   lines.push('');
 
   lines.push('## 6. 方法学与诚实边界');

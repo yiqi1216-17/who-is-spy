@@ -18,9 +18,10 @@ import type { Player } from '../types.js';
 /**
  * 阵营胜率军备竞赛的验收(OpenSpec 04 · 题面②「学了更强策略,平民/卧底能不能更容易赢」)
  *
- * 钉四件事:①同 seed 逐字节可复现;②三步摆动**方向正确**(civ↑→spy↑→civ↑);
+ * 钉五件事:①同 seed 逐字节可复现;②四步摆动**方向正确**(civ↑→spy↑→civ↑→spy↑);
  * ③**因果性**——同 seed 仅换技能配置,胜者分布确实改变(反证胜率由策略技能驱动、非固定);
- * ④隔离 + 脱敏——投票只依赖公开描述、落盘工件扫不出任何密词。
+ * ④**诡辩机制**——稳态伪装 + 确信阈值把强平民下失衡的胜率拉回均衡,且新字段向后兼容;
+ * ⑤隔离 + 脱敏——投票只依赖公开描述、落盘工件扫不出任何密词。
  */
 
 const GAMES = 80;
@@ -45,37 +46,40 @@ describe('军备竞赛可复现性', () => {
   }, 30_000);
 });
 
-describe('三步摆动方向正确(军备竞赛成立)', () => {
-  it('civ↑ → spy↑ → civ↑,且全程 100% 完局', async () => {
+describe('四步摆动方向正确(军备竞赛成立)', () => {
+  it('civ↑ → spy↑ → civ↑ → spy↑,且全程 100% 完局', async () => {
     const { skills, expectations } = defaultSkills();
     const report = await runArmsRace(skills, expectations, GAMES, SEED);
 
     // 每档都完局(胜率摆动不能靠「打不完的局」制造)
     for (const it of report.iterations) expect(it.completionRate).toBe(1);
 
-    // 三步:平民觉醒→平民更强;卧底反制→卧底更强;平民精进→平民更强
-    expect(report.steps).toHaveLength(3);
+    // 四步:平民觉醒→平民更强;卧底反制→卧底更强;平民精进→平民更强;卧底诡辩→卧底更强(拉回均衡)
+    expect(report.steps).toHaveLength(4);
     expect(report.steps[0].actual).toBe<Advantage>('civilian');
     expect(report.steps[0].civilianDelta).toBeGreaterThan(0);
     expect(report.steps[1].actual).toBe<Advantage>('undercover');
     expect(report.steps[1].undercoverDelta).toBeGreaterThan(0);
     expect(report.steps[2].actual).toBe<Advantage>('civilian');
     expect(report.steps[2].civilianDelta).toBeGreaterThan(0);
+    expect(report.steps[3].actual).toBe<Advantage>('undercover');
+    expect(report.steps[3].undercoverDelta).toBeGreaterThan(0);
 
     // 每一步都与设计意图一致 → 总裁决成立
     expect(report.steps.every((s) => s.swungAsExpected)).toBe(true);
     expect(report.armsRaceHolds).toBe(true);
-  }, 30_000);
+  }, 45_000);
 
-  it('平民胜率呈「高—低—高」的军备竞赛曲线(非单调)', async () => {
+  it('平民胜率呈「高—低—高—低」的军备竞赛曲线(非单调、往复摆动)', async () => {
     const { skills, expectations } = defaultSkills();
     const r = await runArmsRace(skills, expectations, GAMES, SEED);
     const civ = r.iterations.map((it) => it.civilianWinRate);
-    // civ-awake 高于两侧(平民觉醒的峰),spy-counter 是谷,civ-refined 再抬起
+    // civ-awake 高于两侧(平民觉醒的峰),spy-counter 是谷,civ-refined 再抬起,spy-sophist 再压回
     expect(civ[1]).toBeGreaterThan(civ[0]); // 觉醒
     expect(civ[1]).toBeGreaterThan(civ[2]); // 被卧底压回
     expect(civ[3]).toBeGreaterThan(civ[2]); // 精进再起
-  }, 30_000);
+    expect(civ[4]).toBeLessThan(civ[3]); // 诡辩再压回(卧底扳平)
+  }, 45_000);
 });
 
 describe('因果性:胜率确由技能驱动,而非固定', () => {
@@ -95,6 +99,41 @@ describe('因果性:胜率确由技能驱动,而非固定', () => {
     const b = await runIteration(hidden, GAMES, SEED);
     // 卧底更会融入 + 转移火力 → 卧底胜率明显更高
     expect(b.undercoverWinRate).toBeGreaterThan(a.undercoverWinRate + 0.05);
+  }, 30_000);
+});
+
+describe('诡辩机制:稳态伪装 + 确信阈值把胜率拉回均衡', () => {
+  // 对照基:平民已精进到跨轮累计(civ-refined 档),卧底仅逐轮融入 → 平民一度大幅占优。
+  const refined: SkillProfile = {
+    id: 'refined', label: '', civSkill: 1.0, civMode: 'cumulative', spyBlend: 0.85, spyDeflect: 0.7,
+  };
+
+  it('spyConsistent + identifyGap:面对跨轮累计平民,卧底胜率被显著抬升', async () => {
+    // 唯一变量是「诡辩两开关」;同 civMode='cumulative' 的强平民下,稳态伪装 + 确信阈值应把卧底救回。
+    const sophist: SkillProfile = {
+      ...refined, id: 'sophist', spyBlend: 0.95, spyConsistent: true, identifyGap: 0.06,
+    };
+    const a = await runIteration(refined, GAMES, SEED);
+    const b = await runIteration(sophist, GAMES, SEED);
+    expect(b.undercoverWinRate).toBeGreaterThan(a.undercoverWinRate + 0.1);
+  }, 45_000);
+
+  it('确信阈值(identifyGap)是真实杠杆:抹平离群度差后平民更常「不敢锁定」', async () => {
+    // 仅在 refined 基础上加确信阈值(不改伪装),平民要求「最离群者足够突出」才锁定 → 卧底胜率抬升。
+    const gated: SkillProfile = { ...refined, id: 'gated', identifyGap: 0.06 };
+    const a = await runIteration(refined, GAMES, SEED);
+    const b = await runIteration(gated, GAMES, SEED);
+    expect(b.undercoverWinRate).toBeGreaterThanOrEqual(a.undercoverWinRate);
+  }, 45_000);
+
+  it('默认档位(未开诡辩开关)逐字节不受新字段影响:向后兼容', async () => {
+    // spyConsistent/identifyGap 均为 undefined 时,行为必须与不带这两个字段的老配置完全一致。
+    const withoutFields: SkillProfile = { id: 'x', label: '', civSkill: 0.85, civMode: 'round', spyBlend: 0.85, spyDeflect: 0.7 };
+    const withUndefined: SkillProfile = { ...withoutFields, spyConsistent: undefined, identifyGap: undefined };
+    const a = await runIteration(withoutFields, 24, SEED);
+    const b = await runIteration(withUndefined, 24, SEED);
+    expect(a.civilianWinRate).toBe(b.civilianWinRate);
+    expect(a.undercoverWinRate).toBe(b.undercoverWinRate);
   }, 30_000);
 });
 
@@ -196,7 +235,7 @@ describe('逐局逐轮 trace(「胜率是怎么打出来的」)', () => {
     const la = toArmsRaceTraceLines(a);
     const lb = toArmsRaceTraceLines(b);
     expect(la).toEqual(lb); // 同 seed 同配置逐字节相等
-    expect(la.length).toBe(4 * 12); // 四档 × 12 局
+    expect(la.length).toBe(5 * 12); // 五档 × 12 局
 
     // 落盘脱敏:整块扫不出密词,且每行是合法 JSON、含 kind:'trace'
     expect(scanSecrets(la.join('\n'))).toEqual([]);
