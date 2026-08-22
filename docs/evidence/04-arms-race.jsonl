@@ -1,8 +1,10 @@
 {"kind":"iteration","seed":7,"games":80,"skill":"baseline","civilianWinRate":0.65,"undercoverWinRate":0.35,"completionRate":1}
-{"kind":"iteration","seed":7,"games":80,"skill":"civ-awake","civilianWinRate":0.8375,"undercoverWinRate":0.1625,"completionRate":1}
-{"kind":"iteration","seed":7,"games":80,"skill":"spy-counter","civilianWinRate":0.625,"undercoverWinRate":0.375,"completionRate":1}
-{"kind":"iteration","seed":7,"games":80,"skill":"civ-refined","civilianWinRate":0.8,"undercoverWinRate":0.2,"completionRate":1}
-{"kind":"step","from":"baseline","to":"civ-awake","civilianDelta":0.1875,"undercoverDelta":-0.1875,"expected":"civilian","actual":"civilian","swungAsExpected":true}
-{"kind":"step","from":"civ-awake","to":"spy-counter","civilianDelta":-0.2125,"undercoverDelta":0.2125,"expected":"undercover","actual":"undercover","swungAsExpected":true}
-{"kind":"step","from":"spy-counter","to":"civ-refined","civilianDelta":0.175,"undercoverDelta":-0.175,"expected":"civilian","actual":"civilian","swungAsExpected":true}
+{"kind":"iteration","seed":7,"games":80,"skill":"civ-awake","civilianWinRate":0.85,"undercoverWinRate":0.15,"completionRate":1}
+{"kind":"iteration","seed":7,"games":80,"skill":"spy-counter","civilianWinRate":0.7,"undercoverWinRate":0.3,"completionRate":1}
+{"kind":"iteration","seed":7,"games":80,"skill":"civ-refined","civilianWinRate":0.7625,"undercoverWinRate":0.2375,"completionRate":1}
+{"kind":"iteration","seed":7,"games":80,"skill":"spy-sophist","civilianWinRate":0.5,"undercoverWinRate":0.5,"completionRate":1}
+{"kind":"step","from":"baseline","to":"civ-awake","civilianDelta":0.2,"undercoverDelta":-0.2,"expected":"civilian","actual":"civilian","swungAsExpected":true}
+{"kind":"step","from":"civ-awake","to":"spy-counter","civilianDelta":-0.15,"undercoverDelta":0.15,"expected":"undercover","actual":"undercover","swungAsExpected":true}
+{"kind":"step","from":"spy-counter","to":"civ-refined","civilianDelta":0.0625,"undercoverDelta":-0.0625,"expected":"civilian","actual":"civilian","swungAsExpected":true}
+{"kind":"step","from":"civ-refined","to":"spy-sophist","civilianDelta":-0.2625,"undercoverDelta":0.2625,"expected":"undercover","actual":"undercover","swungAsExpected":true}
 {"kind":"verdict","armsRaceHolds":true}
