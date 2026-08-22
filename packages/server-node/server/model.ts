@@ -98,7 +98,8 @@ export class DeepSeekClient implements GameModel {
             '为本轮给出一句公开描述（陈述句，不得为问句/反问）。description 需为 2–60 个字符（约 28 个汉字以内），不能包含自己的词。' +
             (hasPrior ? '必须含你自己词的新信息；对先发的呼应可选、至多一位。' : ''),
           context,
-          output: { description: 'string', private_reasoning_summary: 'string' },
+          // 只要 description 一个字段:延迟正比于输出长度,砍掉不被消费的字段即等比提速。
+          output: { description: 'string' },
         }),
       },
     ];
@@ -106,7 +107,9 @@ export class DeepSeekClient implements GameModel {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const result = descriptionSchema.parse(await this.chatJson(messages));
+        // 描述 ≤60 字,给足 JSON 包裹余量即封顶(160 ≈ 2.5× 正常长度):够长描述完整闭合 JSON,
+        // 又杜绝模型跑长。太紧会把 JSON 截断→解析失败→触发重试反而更慢,故留足余量。
+        const result = descriptionSchema.parse(await this.chatJson(messages, 0.8, 160));
         if (result.description.includes(context.identity.word)) {
           throw new Error('描述包含秘密词');
         }
@@ -157,7 +160,7 @@ export class DeepSeekClient implements GameModel {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const result = godDescribeSchema.parse(await this.chatJson(messages));
+        const result = godDescribeSchema.parse(await this.chatJson(messages, 0.8, 160));
         if (result.description.includes(context.identity.word)) {
           throw new Error('描述包含秘密词');
         }
@@ -191,7 +194,7 @@ export class DeepSeekClient implements GameModel {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const result = voteSchema.parse(await this.chatJson(messages));
+        const result = voteSchema.parse(await this.chatJson(messages, 0.8, 160));
         if (!targetIds.includes(result.targetId)) {
           throw new Error(`无效投票目标: ${result.targetId}`);
         }
@@ -241,7 +244,11 @@ export class DeepSeekClient implements GameModel {
     throw new ModelError('AI 未能生成结构化复盘', lastError);
   }
 
-  private async chatJson(messages: ChatMessage[], temperature = 0.8): Promise<unknown> {
+  private async chatJson(
+    messages: ChatMessage[],
+    temperature = 0.8,
+    maxTokens?: number,
+  ): Promise<unknown> {
     if (!this.isConfigured()) {
       throw new ModelError('未配置 DEEPSEEK_API_KEY，请复制 .env.example 为 .env 后填写密钥');
     }
@@ -262,6 +269,7 @@ export class DeepSeekClient implements GameModel {
             messages,
             temperature,
             response_format: { type: 'json_object' },
+            ...(maxTokens ? { max_tokens: maxTokens } : {}),
           }),
           signal: controller.signal,
         });

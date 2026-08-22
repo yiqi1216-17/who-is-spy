@@ -6,6 +6,7 @@ services:
     name: who-is-spy-api
     runtime: node
     plan: free # 免费档演示够用;冷启动 ~30s,对局在内存中,实例休眠即丢(见 docs/DEPLOY.md)
+    region: singapore # 就近 DeepSeek(中国):新加坡↔中国 RTT 远小于美国机房,整轮从 ~75s 降到 ~15-25s
     rootDir: .
     # 只装 server-node 一个 workspace(前端由 Vercel 构建,这里不需要)。
     # --include=dev 必须显式:NODE_ENV=production 会让 npm 默认剔除 devDeps,而启动依赖 tsx(devDep)。
